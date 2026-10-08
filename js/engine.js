@@ -274,6 +274,23 @@
       return out;
     }
 
+    // Winning points Black already had on its previous turn and passed over. (A winning point
+    // that Black's last stone just created is an ordinary threat, not an ignored win.)
+    ignoredWins() {
+      const last = [...this.history].reverse().find((h) => h.who === 'maker');
+      if (!last) return [];
+      this.maker.delete(last.cell);
+      const out = [];
+      for (const k of this.winningPoints()) {
+        if (k === last.cell) continue;
+        this.maker.add(k);
+        if (this.findSnake(k)) out.push(k);
+        this.maker.delete(k);
+      }
+      this.maker.add(last.cell);
+      return out;
+    }
+
     findSnake(k) {
       const x0 = kx(k), y0 = ky(k);
       for (const cells of ORIENTS) {
