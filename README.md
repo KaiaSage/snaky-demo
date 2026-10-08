@@ -39,6 +39,12 @@ diagonal or knight's-move first reply. The cards come from the search in `resear
 
 The paper's (0,0) maps to board point B2, so card 727's pivot (8,8) is tengen (K10).
 
+## Publishing changes
+
+Script and stylesheet links carry a content hash (`js/app.js?v=…`) so browsers never pair a new page with a cached
+old script. After editing anything in `js/` or `css/`, run `node tools/make-twenty.mjs` (it regenerates `/twenty` and
+restamps both pages) before committing.
+
 ## Checks
 
 ```

@@ -5,9 +5,11 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (p) => readFileSync(root + p, 'utf8');
 let html = read('index.html');
-html = html.replace('<link rel="stylesheet" href="css/style.css">', () => `<style>\n${read('css/style.css')}</style>`);
+// Links may carry a version stamp (?v=...) from tools/stamp.mjs.
+const inline = (re, tag, f) => { if (!re.test(html)) throw new Error('missing link to ' + f); html = html.replace(re, () => `<${tag}>\n${read(f)}</${tag}>`); };
+inline(/<link rel="stylesheet" href="css\/style\.css(\?v=[0-9a-f]+)?">/, 'style', 'css/style.css');
 for (const f of ['js/certificate.js', 'js/engine.js', 'js/app.js']) {
-  html = html.replace(`<script src="${f}"></script>`, () => `<script>\n${read(f)}</script>`);
+  inline(new RegExp(`<script src="${f.replace('.', '\\.')}(\\?v=[0-9a-f]+)?"></script>`), 'script', f);
 }
 // claude.ai builds its own link preview, so drop ours.
 html = html.replace(/<meta name="description"[^>]*>\s*|<!-- link previews[^>]*-->\s*|<meta (property="og:|name="twitter:)[^>]*>\s*/g, '');
