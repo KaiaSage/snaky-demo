@@ -1003,6 +1003,23 @@ globalThis.SNAKY_CERTIFICATE = `6 14 4:100 5:101
       return out;
     }
 
+    // Winning points Black already had on its previous turn and passed over. (A winning point
+    // that Black's last stone just created is an ordinary threat, not an ignored win.)
+    ignoredWins() {
+      const last = [...this.history].reverse().find((h) => h.who === 'maker');
+      if (!last) return [];
+      this.maker.delete(last.cell);
+      const out = [];
+      for (const k of this.winningPoints()) {
+        if (k === last.cell) continue;
+        this.maker.add(k);
+        if (this.findSnake(k)) out.push(k);
+        this.maker.delete(k);
+      }
+      this.maker.add(last.cell);
+      return out;
+    }
+
     findSnake(k) {
       const x0 = kx(k), y0 = ky(k);
       for (const cells of ORIENTS) {
@@ -1246,8 +1263,10 @@ function glassText(g, log) {
     out.push(`ANY OTHER REPLY: Black finishes on move ${g.makerMoves + base.value}.`);
     out.push(`CARDS: Black holds ${total}; the best reply blocks ${perfect[0][1].blocked} of them.`);
   }
-  const wins = g.winningPoints();
-  if (wins.length) out.push(`IGNORED WIN: Black could win now at ${wins.map(goName).join(' or ')}, but its plan won't play there.`);
+  const passed = g.ignoredWins();
+  const threats = g.winningPoints().filter((k) => !passed.includes(k));
+  if (threats.length) out.push(`BLACK THREATENS: ${threats.map(goName).join(' and ')} would complete Snaky next move.`);
+  if (passed.length) out.push(`PASSED-OVER WIN: last turn Black could have won at ${passed.map(goName).join(' or ')} and played elsewhere.`);
   out.push('KEY: a card is one prepared way for Black to win. Your stone blocks a card if it lands in that');
   out.push('  card\'s area. Black always plays on its fastest unblocked card and never looks for other wins.');
   return out;
@@ -1328,7 +1347,7 @@ function homeText(origin) {
     'START (recommended for agents: short pages, play by adding &move=K11):',
     `${origin}/play?w=&links=0`,
     '',
-    'START WITH THE STRATEGY VIEW (best replies, cards, ignored wins):',
+    'START WITH THE STRATEGY VIEW (best replies, cards, threats, passed-over wins):',
     `${origin}/play?w=&links=0&glass=1`,
     '',
     'START WITH A LINK FOR EVERY MOVE (for fetch tools that only follow links they have seen):',

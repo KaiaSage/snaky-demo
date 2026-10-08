@@ -16,8 +16,8 @@ two SGF letters each (`w=kjjhij` is L10, K12, J10).
 Without `links=0`, every page lists a link per empty point, because many agent fetch tools only follow URLs they
 have already seen. Pages use short labelled lines (`STATUS:`, `SUMMARY:`, `POSITION URL:`, …) with each URL on its own
 line, because some fetch tools only quote short lines verbatim and paraphrase the rest. Error pages are 400s that link
-back to the last valid position. The glass view also flags wins Black's plan ignores: Black only plays its current
-card's next stone, so it can leave a finished shape one move away.
+back to the last valid position. The glass view also lists Black's threats and any win Black has passed over: Black only plays its current
+card's next stone, so it can leave a finished shape one move away for many turns.
 Responses are plain text, cacheable (the same URL always gives the same page), and CORS-open.
 
 ## Deploy

@@ -62,6 +62,12 @@ ok(/^SUMMARY: BEST .* \| FINISH move 21 \| LOST SO FAR 0$/m.test(glass.text), 'g
 const long = [home, glass, mv].flatMap((r) => r.text.split('\n')).filter((l) => l.length > 110 && !/^https?:\/\//.test(l) && !l.startsWith('(;GM'));
 ok(!long.length, 'no long non-URL lines' + (long.length ? ': ' + long[0] : ''));
 
+// A known perfect line where Black passes over a win at J12 (from Black's 12th move on).
+const pl = await get('/play?w=lkkiikfkgiljjkhhfgkg&links=0&glass=1');
+ok(/^BLACK THREATENS: J12 and L14 would/m.test(pl.text) && !/PASSED-OVER/.test(pl.text), 'a fresh threat is not called passed over');
+const pl2 = await get('/play?w=lkkiikfkgiljjkhhfgkgkf&links=0&glass=1');
+ok(/^PASSED-OVER WIN: last turn Black could have won at J12 /m.test(pl2.text) && /^BLACK THREATENS: F14 /m.test(pl2.text), 'passed-over win and new threat are told apart');
+
 const big = await get('/play?w=');
 console.log(`page sizes: with links ${big.text.length} chars, without ${(await get('/play?w=&links=0')).text.length} chars`);
 let t = performance.now(); for (let i = 0; i < 20; i++) await get('/play?w=kjjhijej&glass=1'); console.log(`avg request ${((performance.now() - t) / 20).toFixed(1)} ms (glass, 4 moves)`);
