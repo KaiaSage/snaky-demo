@@ -16,7 +16,10 @@ here = Path(__file__).parent
 source = (here / 'paper_verify.py').read_text()
 
 OLD_SYMBOLS = "symbols = '0123456789ABCDEFG'"
-NEW_SYMBOLS = "symbols = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'"
+alphabet = (here / 'symbols.mjs').read_text().split('`')[1]
+assert alphabet.startswith('0123456789ABCDEFG') and len(set(alphabet)) == len(alphabet)
+assert not any(c in alphabet for c in ' ():')
+NEW_SYMBOLS = 'symbols = ' + repr(alphabet)
 OLD_TAIL = source[source.index('    assert len(AA) == 728'):]
 NEW_TAIL = '''    # Card 727 is still the paper's card ...
     assert len(TT[727]) == 251 and AA[727] == set() and HH[727] == 21
