@@ -115,12 +115,13 @@ export function solve(M, B, t) {
 }
 
 // ---------------------------------------------------------------- card output
-// New cards live in board coordinates + SHIFT; references give placements into that frame.
-const SHIFT = 16;
+// Each new card is written in its own local frame: board coordinates shifted so that the lower-left
+// corner of its envelope sits at (LOCAL, LOCAL). A child's envelope lies inside its parent's, so every
+// placement between cards comes out with a nonnegative translation, as the paper's format requires.
+const LOCAL = 120;
 export const lines = [];
 let nextId = cert.cards.length;
 const sym = (v) => { if (v < 0 || v >= SYMBOLS.length) throw new Error('coordinate out of range: ' + v); return SYMBOLS[v]; };
-const toFrame = S.translate(SHIFT, SHIFT);
 const inlineId = new Map();
 const inlineText = new Map();
 for (const card of cert.cards.slice(6)) {
@@ -139,20 +140,29 @@ function cardIdOf(node) {
   if (id == null) { id = nextId++; lines.push(`${id} ${inlineText.get(node)}`); inlineId.set(node, id); }
   return id;
 }
-function ref(c) {
-  if (c.node.newId != null) return String(c.node.newId); // new cards are already in the shared frame
-  const id = cardIdOf(c.node);
-  const G = S.compose(toFrame, c.F);
+// Reference to claim c from a card whose local frame is parentFrame (board -> local).
+function ref(c, parentFrame) {
+  const learned = c.node.newId != null;
+  const id = learned ? c.node.newId : cardIdOf(c.node);
+  // node frame -> board -> parent's local frame (a learned card's node frame is the board itself,
+  // and its own text is written in its local frame, so undo that first).
+  const G = learned ? S.compose(parentFrame, S.compose(c.F, S.translate(-c.node.frame.tx, -c.node.frame.ty)))
+    : S.compose(parentFrame, c.F);
   let s = -1;
   for (let k = 0; k < 8; k++) if (RS[k].a === G.a && RS[k].b === G.b && RS[k].c === G.c && RS[k].d === G.d) s = k;
+  if (s < 0) throw new Error('not a signed permutation');
   return s === 0 && !G.tx && !G.ty ? String(id) : `${id}:${s}${sym(G.tx)}${sym(G.ty)}`;
 }
+const placedA = (c) => { if (!c._A) { c._A = new Set(); for (const k of c.node.A) c._A.add(S.applyKey(c.F, k)); } return c._A; };
+
+// The combination card (pivot p; claims cs and per-escape children kids), with its required set and
+// envelope computed by the paper's rule (2). M2 is Black's stones including p.
 export function makeCard(p, M2, Kset, cs, kids) {
   // Keep just enough claims from cs that their envelopes meet only in Black stones and K
   // (each reply in K has its own child among kids).
   const chosen = [];
   let inter = null;
-  for (const c of [...cs].sort((a, b) => placedT(a).size - placedT(b).size)) {
+  for (const c of [...(cs || [])].sort((a, b) => placedT(a).size - placedT(b).size)) {
     const T = placedT(c);
     const next = inter ? new Set([...inter].filter((k) => T.has(k))) : new Set(T);
     if (!inter || next.size < inter.size) { chosen.push(c); inter = next; }
@@ -160,11 +170,37 @@ export function makeCard(p, M2, Kset, cs, kids) {
   }
   const children = [...chosen, ...kids];
   const h = 1 + Math.max(...children.map((c) => c.h));
-  const refs = [...new Set(children.map(ref))].join(' '); // may number inline copies, so before our own id
+  const A = new Set(), T = new Set([p]);
+  let common = null;
+  for (const c of children) {
+    const Tc = placedT(c);
+    for (const k of Tc) T.add(k);
+    for (const k of placedA(c)) A.add(k);
+    if (!common) common = new Set(Tc); else for (const k of common) if (!Tc.has(k)) common.delete(k);
+  }
+  for (const k of common) A.add(k);
+  A.delete(p);
+  for (const k of A) if (!M2.has(k)) throw new Error('combination needs a stone Black does not have');
+  let mx = Infinity, my = Infinity;
+  for (const k of T) { mx = Math.min(mx, S.kx(k)); my = Math.min(my, S.ky(k)); }
+  const frame = S.translate(LOCAL - mx, LOCAL - my);
+  const refs = [...new Set(children.map((c) => ref(c, frame)))].join(' '); // may number inline copies, so before our own id
   const id = nextId++;
-  const node = { newId: id, h };
-  const q = S.applyKey(toFrame, p);
+  const node = { newId: id, h, A, T, frame, base: false, kids: [] };
+  const q = S.applyKey(frame, p);
   lines.push(`${id} ${sym(S.kx(q))}${sym(S.ky(q))} ${refs}`);
   return { node, F: S.ID, h };
 }
 
+// Adds a new card to the claim pool, so later positions can use it in any symmetry and placement.
+export const learnedCount = { n: 0 };
+export function learn(claim) {
+  const n = claim.node;
+  if (n.newId == null || n.learned || !n.A.size) return;
+  n.learned = true;
+  const entry = { node: n, A: [...n.A].map((k) => [S.kx(k), S.ky(k)]), T: n.T, h: n.h };
+  let i = pool.findIndex((e) => e.h > entry.h);
+  if (i < 0) i = pool.length;
+  pool.splice(i, 0, entry);
+  learnedCount.n++;
+}

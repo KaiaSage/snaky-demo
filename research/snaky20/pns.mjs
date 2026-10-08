@@ -13,7 +13,8 @@
 //   wins within t moves (certificate coordinates).
 import { writeFileSync } from 'node:fs';
 import { S, OFF, extraLines } from './lib.mjs';
-import { pool, RS, claims, placedT, makeCard, lines } from './claimsearch.mjs';
+import { pool, RS, claims, placedT, makeCard, lines, learn, learnedCount } from './claimsearch.mjs';
+const LEARN = process.env.LEARN === '1';
 
 const GOAL = +(process.argv[2] || 19);
 const MAX_EXP = +(process.argv[3] || 20000);
@@ -66,6 +67,8 @@ function update(n) {
     for (const c of n.children) { pn = Math.min(pn, c.pn); dn = Math.min(INF, dn + c.dn); }
     n.pn = pn; n.dn = dn;
     if (pn === 0 || dn === 0) solved.set(n.key, { proven: pn === 0, node: n });
+    // Learning: a position proved by a Black move becomes a new card in the pool right away.
+    if (pn === 0 && LEARN && !n.cardClaim && n.M.size) learn(claimOf(n)); // (not the empty-board root)
   } else {
     if (!n.children) { n.pn = n.K.length; n.dn = n.K.length ? 1 : INF; return; }
     let pn = 0, dn = INF;
@@ -135,7 +138,7 @@ if (POS) {
   while (sub.pn !== 0 && sub.dn !== 0 && expansions < MAX_EXP) {
     if (!sub.children && !sub.leaf) expandOr(sub); else iterate(sub);
     update(sub);
-    if (expansions - last >= 500) { last = expansions; console.log(`  ${expansions} expansions, ${((Date.now() - t1) / 1000).toFixed(0)}s: pn ${sub.pn} dn ${sub.dn}`); }
+    if (expansions - last >= 500) { last = expansions; console.log(`  ${expansions} expansions, ${((Date.now() - t1) / 1000).toFixed(0)}s: pn ${sub.pn} dn ${sub.dn}, learned ${learnedCount.n}`); }
   }
   if (sub.pn === 0) {
     const c = claimOf(sub);
@@ -154,13 +157,18 @@ while (rootOr.pn !== 0 && rootOr.dn !== 0 && expansions < MAX_EXP) {
     lastLog = expansions;
     const done = rootAnd.children ? rootAnd.children.filter((c) => c.pn === 0).length : 0;
     const dead = rootAnd.children ? rootAnd.children.filter((c) => c.dn === 0).length : 0;
-    console.log(`  ${expansions} expansions, ${((Date.now() - t0) / 1000).toFixed(0)}s: root pn ${rootOr.pn} dn ${rootOr.dn}; first replies proven ${done}/${rootAnd.K.length}, refuted ${dead}`);
+    console.log(`  ${expansions} expansions, ${((Date.now() - t0) / 1000).toFixed(0)}s: root pn ${rootOr.pn} dn ${rootOr.dn}; first replies proven ${done}/${rootAnd.K.length}, refuted ${dead}; learned ${learnedCount.n}`);
   }
 }
 const secs = ((Date.now() - t0) / 1000).toFixed(0);
 if (rootOr.pn === 0) {
+  if (ONLY) { // one reply only: the result is the card for that position, not a full proof
+    const sub = claimOf(rootAnd.children[0]);
+    console.log(`PROVED reply ${ONLY}: card ${sub.node.newId} needs ${[...sub.node.A].length} stone(s), height ${sub.h}; ${lines.length} new cards (${expansions} expansions, ${secs}s)`);
+  } else {
   const root = makeCard(first, new Set([first]), new Set(rootAnd.K), cs, rootAnd.children.map(claimOf));
   console.log(`PROVED goal ${GOAL}: final card ${root.node.newId}, height ${root.h}, ${lines.length} new cards (${expansions} expansions, ${secs}s)`);
+  }
   if (OUT) { writeFileSync(OUT, [globalThis.SNAKY_CERTIFICATE.trim(), ...extraLines, ...lines].join('\n') + '\n'); console.log('wrote ' + OUT); }
 } else if (rootOr.dn === 0) {
   const dead = rootAnd.children.filter((c) => c.dn === 0).map((c) => `(${S.kx([...c.B][0]) - OFF},${S.ky([...c.B][0]) - OFF})`);
