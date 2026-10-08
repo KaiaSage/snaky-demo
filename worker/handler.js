@@ -117,7 +117,19 @@ function gameText(origin, w, opts) {
     out.push('', `New game: ${playUrl(origin, '', opts)}`);
     return out.join('\n');
   }
-  out.push('Your move. To play a point, fetch its link below, or add &move=<point> (like &move=K11) to this URL.');
+  // Always print the canonical URL of this position (any &move= already folded into w).
+  const here = playUrl(origin, w, opts);
+  let example = null;
+  for (const k of [...g.maker].reverse()) { // an empty neighbour of Black's stones makes a plausible example
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const x = S.kx(k) + dx, y = S.ky(k) + dy;
+      if (!example && g.inBoard(x, y) && g.isFree(S.key(x, y))) example = goName(S.key(x, y));
+    }
+  }
+  out.push(`Your move. This position is: ${here}`);
+  // No punctuation right after a URL: agents tend to copy it into the link.
+  out.push('To play a point, fetch that URL with &move=<point> added' + (opts.links ? ', or fetch the point\'s link below' : '') + '. For example:');
+  out.push(`${here}&move=${example}`);
   if (opts.links) {
     out.push('');
     for (let y = 18; y >= 0; y--) for (let x = 0; x < 19; x++) {

@@ -46,6 +46,13 @@ ok(bad3.status === 400 && bad3.text.includes("Can't read"), 'unreadable move is 
 const nf = await get('/nope');
 ok(nf.status === 404, 'unknown path is a 404');
 
+// The page must give the canonical URL, with any &move folded into w.
+const mv = await get('/play?w=&links=0&move=K11');
+ok(mv.text.includes('This position is: https://snaky.example/play?w=ji&links=0\n'), '&move page prints the canonical position URL');
+const next = /For example:\n(\S+)$/m.exec(mv.text)[1];
+const after = await get(next.slice(ORIGIN.length));
+ok(after.status === 200 && /Moves so far: B K10, W K11, B \w+, W /.test(after.text), 'the example URL plays a second move after K11');
+
 const big = await get('/play?w=');
 console.log(`page sizes: with links ${big.text.length} chars, without ${(await get('/play?w=&links=0')).text.length} chars`);
 let t = performance.now(); for (let i = 0; i < 20; i++) await get('/play?w=kjjhijej&glass=1'); console.log(`avg request ${((performance.now() - t) / 20).toFixed(1)} ms (glass, 4 moves)`);
