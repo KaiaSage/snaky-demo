@@ -63,6 +63,11 @@ playing three games this way scored 13, 9 and 11.
 `worker/` is a Cloudflare Worker for agents that can fetch URLs but can't run code: each GET returns the board as
 text plus a link for every legal reply. See [worker/README.md](worker/README.md) for routes and deployment.
 
+## Research
+
+`research/snaky20/` extends the paper's certificate to a 20-move one (the plan plus "take any immediate win"),
+checked by the paper's own verifier. It is a draft and unreviewed; see its README.
+
 ## Credits
 
 The proof and certificate are from “Snaky in 21 Maker moves” (OpenAI, 2026), produced by an unreleased OpenAI model.
