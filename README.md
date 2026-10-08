@@ -38,6 +38,12 @@ node tools/check.mjs      # rebuilds the certificate and compares with the paper
 node tools/simulate.mjs   # plays random, envelope-only and perfect White against both policies
 ```
 
+## Hosting
+
+Any static host works; there is no build step. For GitHub Pages: Settings → Pages → Deploy from a branch → root.
+`index.html` carries Open Graph tags pointing at `https://kaiasage.github.io/snaky-demo/assets/og.png` for link
+previews; change those URLs if you host elsewhere. `tools/make-og-image.mjs` regenerates the image (needs Playwright).
+
 ## Playing from a terminal (or letting an agent play)
 
 `tools/play-blind.mjs` is a text version of Blind mode: it shows only the stones, one move per call.

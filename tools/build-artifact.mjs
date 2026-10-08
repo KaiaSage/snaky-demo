@@ -9,6 +9,8 @@ html = html.replace('<link rel="stylesheet" href="css/style.css">', () => `<styl
 for (const f of ['js/certificate.js', 'js/engine.js', 'js/app.js']) {
   html = html.replace(`<script src="${f}"></script>`, () => `<script>\n${read(f)}</script>`);
 }
+// claude.ai builds its own link preview, so drop ours.
+html = html.replace(/<meta name="description"[^>]*>\s*|<!-- link previews[^>]*-->\s*|<meta (property="og:|name="twitter:)[^>]*>\s*/g, '');
 html = html.replace(/<!doctype html>\s*<html[^>]*>\s*<head>\s*/i, '')
   .replace(/<meta charset[^>]*>\s*<meta name="viewport"[^>]*>\s*/i, '')
   .replace(/<\/head>\s*<body>\s*/i, '').replace(/<\/body>\s*<\/html>\s*$/i, '');
