@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snaky in 21</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-text">
+      <p class="eyebrow">Maker–Breaker · the Snaky hexomino · 728 proof cards</p>
+      <h1>Snaky in <span class="seal">21</span></h1>
+      <p class="lede">You play White, the Breaker. Black plays the strategy from
+        <a href="https://github.com/openai/math/blob/main/preprints/Snaky-in-21-Maker-moves-September-25-2026/article.pdf" target="_blank" rel="noopener">“Snaky in 21 Maker moves”</a>
+        and is building the six-stone Snaky shape in any rotation or reflection. It always succeeds. The only question is how long you can make it take.</p>
+    </div>
+    <figure class="snaky-figure" aria-label="The Snaky hexomino">
+      <svg viewBox="0 0 220 96" role="img" aria-hidden="true">
+        <g class="fig-grid"></g>
+      </svg>
+      <figcaption>S = {(0,0),(1,0),(2,0),(3,0),(3,1),(4,1)}</figcaption>
+    </figure>
+  </header>
+
+  <main class="play">
+    <section class="board-col" aria-label="Board">
+      <div class="board-shell">
+        <svg id="board" class="board" role="application" aria-label="19 by 19 Go board"></svg>
+        <div id="tip" class="tip" hidden></div>
+        <div id="banner" class="banner" hidden></div>
+      </div>
+      <div class="board-foot">
+        <span id="legend" class="legend">
+          <span class="lg"><i class="sw sw-env"></i>envelope T</span>
+          <span class="lg"><i class="sw sw-heat1"></i>delays Maker</span>
+          <span class="lg"><i class="sw sw-heat2"></i>keeps the 21 line</span>
+          <span class="lg"><i class="sw sw-pivot"></i>Maker's next threat</span>
+          <span class="lg"><i class="sw sw-req"></i>stones the next card requires</span>
+        </span>
+      </div>
+      <section id="review" class="review" hidden>
+        <div class="review-row">
+          <button id="rv-prev" class="btn" aria-label="Previous reply">◀</button>
+          <input type="range" id="rv-slider" min="0" max="0" value="0" aria-label="Reply to review">
+          <button id="rv-next" class="btn" aria-label="Next reply">▶</button>
+          <button id="rv-resume" class="btn">Resume from here</button>
+          <button id="rv-exit" class="btn">Exit review</button>
+        </div>
+        <p id="rv-text" class="rv-text"></p>
+      </section>
+      <section class="kifu-sec">
+        <div class="kifu-head">
+          <h2>Game record</h2>
+          <span id="kifu-hint" class="kifu-hint"></span>
+        </div>
+        <figure id="tempo" class="tempo" hidden>
+          <svg id="tempo-svg" viewBox="0 0 640 132" role="img" aria-label="Perfect-defense finishing move after each White reply"></svg>
+          <figcaption id="tempo-cap" class="tempo-cap"></figcaption>
+        </figure>
+        <ol id="kifu" class="kifu"></ol>
+        <details class="sgf" id="sgf-box">
+          <summary>SGF</summary>
+          <p class="sgf-note">Copy this game, or paste an SGF and load it. Only White's moves are read; Black replays its own.</p>
+          <textarea id="sgf-text" rows="4" spellcheck="false" aria-label="SGF text"></textarea>
+          <div class="sgf-row">
+            <button id="sgf-copy" class="btn">Copy SGF</button>
+            <button id="sgf-load" class="btn">Load pasted SGF</button>
+            <span id="sgf-msg" class="sgf-msg" aria-live="polite"></span>
+          </div>
+        </details>
+      </section>
+    </section>
+
+    <aside class="panel" aria-label="Game panel">
+      <div class="modes" role="tablist" aria-label="Mode">
+        <button id="mode-glass" role="tab" class="mode" aria-selected="true">Glass box</button>
+        <button id="mode-blind" role="tab" class="mode" aria-selected="false">Blind</button>
+      </div>
+      <p id="mode-note" class="mode-note"></p>
+
+      <div class="clock">
+        <div class="clock-top">
+          <div>
+            <div class="label">Maker stones</div>
+            <div class="big"><span id="moves">1</span><span class="of"> / 21</span></div>
+          </div>
+          <div class="forced-box" id="forced-box">
+            <div class="label">Perfect defense from here</div>
+            <div class="big small"><span id="forced">21</span></div>
+          </div>
+        </div>
+        <div id="pips" class="pips" aria-hidden="true"></div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </div>
+
+      <div class="controls">
+        <button id="btn-undo" class="btn">Undo</button>
+        <button id="btn-hint" class="btn">Hint</button>
+        <button id="btn-auto" class="btn">Watch perfect defense</button>
+        <button id="btn-new" class="btn btn-primary">New game</button>
+      </div>
+
+      <details class="opts">
+        <summary>Options</summary>
+        <label class="opt"><input type="checkbox" id="opt-numbers" checked> Move numbers on stones</label>
+        <label class="opt"><input type="checkbox" id="opt-sound" checked> Stone sounds</label>
+        <label class="opt"><input type="checkbox" id="opt-heatnums"> Show Maker's finishing move on every hot cell</label>
+        <label class="opt"><input type="checkbox" id="opt-paper"> Literal paper policy (first surviving card, replacement moves)</label>
+      </details>
+
+      <section id="glass" class="glass">
+        <h2>Maker's hand</h2>
+        <p class="hand-note" id="hand-note"></p>
+        <div id="cards" class="cards"></div>
+        <h2>Proof path</h2>
+        <p class="hand-note">Each step reads <span class="mono">card:sXY</span>: the card number, its symmetry s (bit 1 swaps x and y, bit 2 flips x, bit 4 flips y), and its offset XY in the paper's alphabet 0–9A–G. h is the most Black moves the card still needs. Hover a step for details.</p>
+        <ol id="path" class="path"></ol>
+      </section>
+
+    </aside>
+  </main>
+
+  <section class="explain">
+    <div class="explain-text">
+      <h2>How Black thinks</h2>
+      <p>The paper proves the result with <em>cards</em>. A card is a promise of the form: if Black already owns the
+        required cells <b>A</b> and White has no stone in the envelope <b>T</b>, Black wins within <b>h</b> more moves.
+        Cards 0–5 are the six ways to be one stone from Snaky. Every later card plays one <em>pivot</em> stone and holds a hand of
+        child cards whose envelopes have nothing in common except cells Black already owns. So whatever White replies,
+        at least one child card survives, and its height is smaller.</p>
+      <p>The final card, 727, needs nothing (A = ∅), fits in a 17×17 square (|T| = 251), and has height 21. Its pivot is
+        the paper's (8,8), which on this board is tengen, the centre point K10. In glass-box mode, every hot cell on the
+        board is a reply that kills the fastest cards in Black's hand.</p>
+      <p class="fact" id="fact"></p>
+    </div>
+  </section>
+
+  <section class="lab">
+    <div class="lab-card">
+      <h2>The squeeze</h2>
+      <p>Card 727 is a hand of 32 placed cards in six groups (Table 1 of the paper). Step through them and watch
+        their common envelope shrink until only the pivot is left. That is why Black needs nothing to start.</p>
+      <div class="squeeze">
+        <canvas id="sq-canvas" width="340" height="340" aria-label="Intersection of child envelopes"></canvas>
+        <div class="sq-side">
+          <div class="label">Children combined</div>
+          <div class="big"><span id="sq-k">0</span><span class="of"> / 32</span></div>
+          <div class="label">Common cells besides (8,8)</div>
+          <div class="big small"><span id="sq-left">250</span></div>
+          <div id="sq-card" class="mono sq-cardname">all of T₇₂₇</div>
+          <input type="range" id="sq-slider" min="0" max="32" value="0" aria-label="Number of children combined">
+          <button id="sq-play" class="btn">Play</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="lab-card">
+      <h2>Card browser</h2>
+      <p>Open any of the 728 cards. Black stones are required cells, squares are the envelope, the red ring is the pivot.
+        Click a child to follow it down.</p>
+      <div class="cb-bar">
+        <label for="cb-input" class="label">Card</label>
+        <input id="cb-input" type="number" min="0" max="727" value="6">
+        <button id="cb-go" class="btn">Open</button>
+        <button id="cb-rand" class="btn">Random</button>
+        <button id="cb-back" class="btn" disabled>Back</button>
+      </div>
+      <div class="cb-body">
+        <canvas id="cb-canvas" width="300" height="300" aria-label="Card diagram"></canvas>
+        <div class="cb-info">
+          <div id="cb-title" class="cb-title"></div>
+          <dl id="cb-stats" class="cb-stats"></dl>
+          <div id="cb-kids" class="cb-kids"></div>
+        </div>
+      </div>
+      <pre id="cb-line" class="cb-line"></pre>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <h2>Credits</h2>
+    <dl class="credits">
+      <dt>The proof</dt>
+      <dd><a href="https://github.com/openai/math/blob/main/preprints/Snaky-in-21-Maker-moves-September-25-2026/article.pdf" target="_blank" rel="noopener">“Snaky in 21 Maker moves”</a>,
+        OpenAI, 25 September 2026, produced by an unreleased OpenAI model. The 728-card certificate Black plays here is its Appendix D,
+        reproduced byte for byte (SHA-256 3fa12d36…3d04) and rebuilt in your browser on every load.</dd>
+      <dt>The method</dt>
+      <dd>Nándor Sieben, whose proof trees for weak achievement games (<i>Integers</i> 8, 2008) are the direct ancestor of the cards,
+        and whose <i>Snaky is a 41-dimensional winner</i> (2004) set out the problem’s history.</dd>
+      <dt>The problem</dt>
+      <dd>Frank Harary, who introduced polyomino achievement games.
+        Harary, Harborth and Seemann, for handicap-two strategies.
+        Immanuel Halupczok and Jan-Christoph Schlage-Puchta (<i>Achieving Snaky</i>, 2007): Snaky wins in three dimensions, loses on an 8×8 board, and has handicap number at most one.
+        Hiro Ito and Hiromitsu Miyagawa: a handicap-one win (2007).
+        András Csernenszky, Ryan R. Martin and András Pluhár: Breaker has no pairing defence (2011).
+        Irfansha Shaik, Valentin Mayer-Eichberger, Jaco van de Pol and Abdallah Saffidine, and Steve Boucher and Roger Villemaire, for QBF encodings of these games.</dd>
+      <dt>This demo</dt>
+      <dd>Designed and built by Claude (Anthropic) in Claude Code. Board, engine, heatmap and snake are plain JavaScript with no server.
+        Type: Shippori Mincho B1, Zen Kaku Gothic New and IBM Plex Mono.</dd>
+    </dl>
+  </footer>
+</div>
+
+<script src="js/certificate.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
