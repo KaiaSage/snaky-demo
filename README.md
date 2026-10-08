@@ -13,6 +13,9 @@ Open `index.html` in a browser. It starts in Blind mode. There is no build step 
   and the proof path from card 727 down to a base card.
 - **Blind**: no help. You win if Black needs all 21 moves. After the game, review it with the glass box.
 - **Review**: after a game (or any time in glass box), click a move in the record or press ← →; *Resume from here* rewinds and lets you try another reply.
+- **What if Black…**: in review, see the position after White's reply with every empty point scored by the best card
+  anywhere in the certificate (any symmetry and offset) that Black would hold after playing there. Click a point to play it
+  as Black and continue the game from that card. Dashed circles are moves that only work by restarting card 727 somewhere clean.
 - **Tempo graph**: after the game, a step chart of the perfect-defense finishing move after each reply; click it to review that reply.
 - **SGF**: copy the game, or paste one and load it (White's moves are replayed; Black answers with this strategy).
 - **Watch perfect defense**: White plays a reply that keeps the maximum delay every time; it always lasts exactly 21.

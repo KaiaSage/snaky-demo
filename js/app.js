@@ -184,7 +184,26 @@
   }
 
   // ---------------------------------------------------------------- views
+  // What-if view: the position right after White's reply, with every empty point scored
+  // by the best certificate claim Black would hold after playing there.
+  function whatIfView() {
+    const i = st.review;
+    if (st.wi && st.wi.i === i && st.wi.game === st.game) return st.wi;
+    const g = new S.Game(cert, { policy: st.policy });
+    g.restore(st.snaps[i]);
+    g.breakerMove(st.log[i].cell);
+    const cover = g.coverMap();
+    const next = st.game.history[2 * i + 2];
+    let best = Infinity;
+    for (const c of cover.values()) best = Math.min(best, c.left);
+    st.wi = { i, game: st.game, g, cover, actual: next ? next.cell : null, best: g.makerMoves + 1 + best };
+    return st.wi;
+  }
+  const inWhatIf = () => st.review != null && st.whatIf;
+  const isRestart = (c) => !c.node.base && c.node.A.size === 0;
+
   function viewGame() {
+    if (inWhatIf()) return whatIfView().g;
     if (st.review != null) {
       const g = new S.Game(cert, { policy: st.policy });
       g.restore(st.snaps[st.review]);
@@ -199,9 +218,10 @@
     [gEnv, gHeat, gStones, gMarks, gSnake, gPreview].forEach(clear);
     const breakerTurn = !g.won && !st.busy;
     const glass = isGlass();
-    const reviewMove = st.review != null ? st.log[st.review].cell : null;
+    const reviewMove = st.review != null && !st.whatIf ? st.log[st.review].cell : null;
 
-    if (glass && breakerTurn && !g.cur.node.base) {
+    if (inWhatIf()) drawCover();
+    if (glass && breakerTurn && !g.cur.node.base && !inWhatIf()) {
       const a = analysis(g);
       const { T } = g.claimCells();
       for (const k of T) {
@@ -253,6 +273,75 @@
     renderHover();
   }
 
+  function drawCover() {
+    const w = whatIfView(), g = w.g;
+    let worst = w.best;
+    for (const c of w.cover.values()) worst = Math.max(worst, g.makerMoves + 1 + c.left);
+    const span = Math.max(1, worst - w.best);
+    for (const [k, c] of w.cover) {
+      const x = px(S.kx(k)), y = py(S.ky(k));
+      const fin = g.makerMoves + 1 + c.left;
+      if (isRestart(c)) {
+        // abandoning the fight: card 727 again, somewhere its envelope is still clean
+        el('rect', { x: x - 13, y: y - 13, width: 26, height: 26, rx: 13, fill: 'none', stroke: '#2d4a80', 'stroke-width': 1.5, 'stroke-dasharray': '3 3', opacity: .55 }, gHeat);
+        el('text', { x, y: y + 4.2, 'text-anchor': 'middle', class: 'heatnum', style: 'fill:#2d4a80;opacity:.7' }, gHeat).textContent = fin;
+        continue;
+      }
+      el('rect', { x: x - 15, y: y - 15, width: 30, height: 30, rx: 6, fill: '#2d4a80', opacity: 0.9 - 0.6 * (fin - w.best) / span }, gHeat);
+      el('text', { x, y: y + 4.2, 'text-anchor': 'middle', class: 'heatnum' }, gHeat).textContent = fin;
+    }
+    if (w.actual != null) {
+      stone('black', w.actual, gMarks, { ghost: true });
+      el('circle', { cx: px(S.kx(w.actual)), cy: py(S.ky(w.actual)), r: 22, fill: 'none', stroke: '#c3412a', 'stroke-width': 3, 'stroke-dasharray': '4 3' }, gMarks);
+    }
+  }
+
+  function renderWhatIfHover(k) {
+    const tip = $('tip');
+    const w = whatIfView(), g = w.g;
+    if (k == null || !g.isFree(k)) { tip.hidden = true; return; }
+    stone('black', k, gHover, { ghost: true });
+    const c = w.cover.get(k);
+    const actual = w.actual != null ? w.cover.get(w.actual) : null;
+    const actualTxt = actual ? ` Black actually played <b>${goName(w.actual)}</b>, finishing by move ${g.makerMoves + 1 + actual.left}.` : '';
+    if (c) {
+      const T = [...c.node.T].map((q) => S.applyKey(c.F, q));
+      for (const q of T) {
+        el('rect', { x: px(S.kx(q)) - 19, y: py(S.ky(q)) - 19, width: 38, height: 38, rx: 4, fill: 'rgba(45,74,128,.13)', stroke: 'rgba(45,74,128,.45)', 'stroke-width': 1 }, gPreview);
+      }
+      const req = c.node.base ? [...c.node.T] : [...c.node.A, S.key(c.node.p[0], c.node.p[1])];
+      for (const q of req) {
+        const a = S.applyKey(c.F, q);
+        el('circle', { cx: px(S.kx(a)), cy: py(S.ky(a)), r: 21.5, fill: 'none', stroke: '#f2c14e', 'stroke-width': 3 }, gPreview);
+      }
+      tip.innerHTML = `<b>${goName(k)}</b> · paper ${paperName(k)}<br>` + (c.left === 0 ? 'This completes Snaky.' : isRestart(c) ?
+        `Black would abandon this fight and start card ${c.label} again from scratch here, where its envelope is still free of White stones. That finishes by move ${g.makerMoves + 1 + c.left} at the latest. Click to play it.` :
+        `Black would hold <b>${c.label}</b> (h${c.node.h}) and win by move ${g.makerMoves + 1 + c.left} at the latest. Click to play it and continue.`) + actualTxt;
+    } else {
+      tip.innerHTML = `<b>${goName(k)}</b> · paper ${paperName(k)}<br>No card in the certificate covers this. Black might still win, but the proof no longer says how or when.` + actualTxt;
+    }
+    tip.hidden = false;
+    placeTip(tip, g, k, []);
+  }
+
+  function playWhatIf(k) {
+    const w = whatIfView();
+    const c = w.cover.get(k);
+    if (!c || !w.g.isFree(k)) return;
+    stopAuto();
+    const i = st.review;
+    st.game = w.g;
+    st.snaps = st.snaps.slice(0, i + 1);
+    st.log = st.log.slice(0, i + 1);
+    st.game.playMakerAt(k, c);
+    st.review = null; st.whatIf = false; st.wi = null; st.hintCell = null; st.hover = null;
+    st.autoUsed = true; // variations don't count toward the blind record
+    st.justPlaced = k;
+    clack(true);
+    if (st.game.won) onWin();
+    render();
+  }
+
   function drawSnake(cells, animate) {
     const pts = cells.map((k) => [px(S.kx(k)), py(S.ky(k))]);
     const d = 'M' + pts.map((p) => p.join(',')).join(' L');
@@ -276,6 +365,7 @@
     const tip = $('tip');
     const g = viewGame();
     const k = st.hover;
+    if (inWhatIf()) { updateCardStates(null); renderWhatIfHover(k); return; }
     if (k == null || st.review != null || g.won || st.busy || !g.isFree(k)) { tip.hidden = true; updateCardStates(null); return; }
     stone('white', k, gHover, { ghost: true });
     if (!isGlass()) { tip.hidden = true; return; }
@@ -341,6 +431,7 @@
     clear(box); cardEls = [];
     const g = viewGame();
     const note = $('hand-note');
+    if (inWhatIf()) { note.textContent = 'Black to move. Each numbered point keeps Black on some card of the certificate; the number is the latest move Black then finishes on. Hover to see the card, click to play it.'; return; }
     if (g.won) { note.textContent = `Snaky completed on Black's move ${g.won.moves}.`; return; }
     if (st.busy || g.cur.node.base) { note.textContent = 'Black is choosing…'; return; }
     const node = g.cur.node;
@@ -430,7 +521,7 @@
 
     $('moves').textContent = g.makerMoves;
     // forced total for the pips
-    let forced = g.won ? g.won.moves : (!st.busy && !g.cur.node.base ? analysis(g).forced : null);
+    let forced = inWhatIf() ? whatIfView().best : g.won ? g.won.moves : (!st.busy && !g.cur.node.base ? analysis(g).forced : null);
     if (forced == null) forced = st.lastForced || 21;
     st.lastForced = forced;
     const fb = $('forced-box');
@@ -448,6 +539,8 @@
     if (g.won) {
       const m = g.won.moves;
       status.innerHTML = m === 21 ? 'Black needed all 21 moves. That is a perfect defense.' : `Snaky on Black’s move ${m}. <b>${21 - m} short</b> of the full 21.`;
+    } else if (inWhatIf()) {
+      status.textContent = 'What if Black had played somewhere else? Blue points stay on the proof.';
     } else if (st.review != null) {
       status.textContent = 'Reviewing. Hot cells were the replies that slowed Black down most.';
     } else if (st.busy) {
@@ -500,7 +593,7 @@
       const li = document.createElement('li');
       let note = '';
       if (h.who === 'maker') {
-        note = h.replacement ? 'replacement move' : n === 1 ? 'tengen, card 727' : (h.descents.length ? `free step ${h.descents.join(' → ')}` : '');
+        note = h.whatIf ? `your Black move · ${h.label}` : h.replacement ? 'replacement move' : n === 1 ? 'tengen, card 727' : (h.descents.length ? `free step ${h.descents.join(' → ')}` : '');
         if (g.won && n === g.history.length) note = 'Snaky!';
       } else {
         const e = st.log[bi++];
@@ -638,6 +731,20 @@
     sl.max = st.log.length - 1;
     sl.value = st.review;
     const e = st.log[st.review];
+    $('rv-whatif').textContent = st.whatIf ? 'Back to White’s reply' : 'What if Black…';
+    $('rv-whatif').classList.toggle('on', !!st.whatIf);
+    $('rv-resume').hidden = !!st.whatIf;
+    if (st.whatIf) {
+      const w = whatIfView();
+      const a = w.actual != null ? w.cover.get(w.actual) : null;
+      let fight = 0;
+      for (const c of w.cover.values()) if (!isRestart(c)) fight++;
+      const restarts = w.cover.size - fight;
+      $('rv-text').innerHTML = `After White ${goName(e.cell)}, ${fight} point${fight === 1 ? '' : 's'} keep${fight === 1 ? 's' : ''} Black on a card in this fight` +
+        (restarts ? `, and ${restarts} more (dashed circles) only work by restarting the whole proof somewhere clean` : '') + `. The best finish by move ${w.best}.` +
+        (a ? ` Black played ${goName(w.actual)} (dashed ring), finishing by move ${w.g.makerMoves + 1 + a.left}.` : '') + ' Click a blue point to play it as Black and continue the game from there.';
+      return;
+    }
     const loss = e.before - e.after;
     const g = viewGame();
     const a = analysis(g);
@@ -777,6 +884,10 @@
   svg.addEventListener('click', (ev) => {
     const k = cellFromEvent(ev);
     if (k == null || st.auto) return;
+    if (inWhatIf()) {
+      if (st.lastPointer === 'touch' && st.hover !== k) { st.hover = k; renderHover(); return; }
+      playWhatIf(k); return;
+    }
     // On touch screens in glass mode the first tap previews, the second plays.
     if (st.lastPointer === 'touch' && isGlass() && st.hover !== k && st.game.isFree(k) && st.review == null) {
       st.hover = k; renderHover(); return;
@@ -816,7 +927,8 @@
   $('rv-slider').oninput = (e) => { st.review = +e.target.value; render(); };
   $('rv-prev').onclick = () => { if (st.review > 0) { st.review--; render(); } };
   $('rv-next').onclick = () => { if (st.review < st.log.length - 1) { st.review++; render(); } };
-  $('rv-exit').onclick = () => { st.review = null; render(); };
+  $('rv-exit').onclick = () => { st.review = null; st.whatIf = false; render(); };
+  $('rv-whatif').onclick = () => { st.whatIf = !st.whatIf; st.hover = null; render(); };
   $('rv-resume').onclick = () => { if (st.review != null) resumeFrom(st.review); };
   $('sgf-text').addEventListener('input', () => { st.sgfDirty = true; });
   $('sgf-copy').onclick = () => {
