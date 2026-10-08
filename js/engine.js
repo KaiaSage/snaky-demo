@@ -260,6 +260,20 @@
       return { index: pick, blocked };
     }
 
+    // Free points where one more Black stone would complete Snaky. The card policy never looks
+    // for these: it only plays its card's next stone, so it can leave a ready win on the board.
+    winningPoints() {
+      const out = [];
+      for (let x = 0; x < this.size; x++) for (let y = 0; y < this.size; y++) {
+        const k = key(x, y);
+        if (!this.isFree(k)) continue;
+        this.maker.add(k);
+        if (this.findSnake(k)) out.push(k);
+        this.maker.delete(k);
+      }
+      return out;
+    }
+
     findSnake(k) {
       const x0 = kx(k), y0 = ky(k);
       for (const cells of ORIENTS) {

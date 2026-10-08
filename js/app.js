@@ -157,7 +157,7 @@
     for (const v of rm.map.values()) max = Math.max(max, v.value);
     const perfect = [];
     for (const [k, v] of rm.map) if (v.value === max) perfect.push(k);
-    c = { sig, policy: g.policy, ...rm, max, perfect, forced: g.makerMoves + max, everywhere: rm.base && rm.base.value === max };
+    c = { sig, policy: g.policy, ...rm, max, perfect, forced: g.makerMoves + max, everywhere: rm.base && rm.base.value === max, wins: g.winningPoints() };
     replyCache.set(g.cur, c);
     return c;
   }
@@ -221,6 +221,14 @@
           const tx = el('text', { x, y: y + 4.2, 'text-anchor': 'middle', class: 'heatnum' }, gHeat);
           tx.textContent = g.makerMoves + v.value;
         }
+      }
+    }
+
+    // Points where Black could already finish Snaky but its plan won't play.
+    if (glass && breakerTurn && !g.cur.node.base) {
+      for (const k of analysis(g).wins) {
+        const x = px(S.kx(k)), y = py(S.ky(k));
+        el('circle', { cx: x, cy: y, r: 11, fill: 'none', stroke: '#3f6b2a', 'stroke-width': 3, 'stroke-dasharray': '3 2.5' }, gHeat);
       }
     }
 
@@ -296,7 +304,8 @@
     const a = analysis(g);
     const finish = g.makerMoves + info.value;
     const delta = a.forced - finish;
-    tip.innerHTML = `<b>${goName(k)}</b> · paper ${paperName(k)}<br>` +
+    const ignored = analysis(g).wins.includes(k) ? '<br>Black could win here right now, but its plan won’t play it.' : '';
+    tip.innerHTML = `<b>${goName(k)}</b> · paper ${paperName(k)}${ignored}<br>` +
       (info.blocked ? `Blocks ${info.blocked} of ${info.total} cards.` : 'Blocks none of Black’s cards.') +
       ` Black switches to <b>${S.kidLabel(kid)}</b> and next threatens <b>${goName(pv)}</b>.<br>` +
       (delta === 0 ? `Keeps the line: perfect play still lasts to move ${finish}.` : `Black then wins by move ${finish} at the latest (−${delta}).`);
@@ -456,6 +465,7 @@
       const a = analysis(g), np = a.perfect.length;
       status.innerHTML = forced === 21 ? (a.everywhere ? 'Your move. Every reply keeps the 21 line here.' : `Your move. You are still on the 21 line; ${np} cell${np === 1 ? '' : 's'} keep${np === 1 ? 's' : ''} it.`)
         : `Your move. Perfect play from here makes Black finish on move ${forced}; <b>${21 - forced} lost</b>.`;
+      if (a.wins.length) status.innerHTML += ` Black could already win at ${a.wins.map(goName).join(' or ')} (green ring), but its plan won’t play there.`;
     } else {
       status.textContent = 'Your move. Click any empty point.';
     }
