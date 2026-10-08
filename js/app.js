@@ -157,7 +157,7 @@
     for (const v of rm.map.values()) max = Math.max(max, v.value);
     const perfect = [];
     for (const [k, v] of rm.map) if (v.value === max) perfect.push(k);
-    c = { sig, policy: g.policy, ...rm, max, perfect, forced: g.makerMoves + max, everywhere: rm.base && rm.base.value === max, wins: g.winningPoints() };
+    c = { sig, policy: g.policy, ...rm, max, perfect, forced: g.makerMoves + max, everywhere: rm.base && rm.base.value === max, wins: g.ignoredWins() };
     replyCache.set(g.cur, c);
     return c;
   }
@@ -304,7 +304,7 @@
     const a = analysis(g);
     const finish = g.makerMoves + info.value;
     const delta = a.forced - finish;
-    const ignored = analysis(g).wins.includes(k) ? '<br>Black could win here right now, but its plan won’t play it.' : '';
+    const ignored = analysis(g).wins.includes(k) ? '<br>Black could have won here last turn, but its plan passed it over.' : '';
     tip.innerHTML = `<b>${goName(k)}</b> · paper ${paperName(k)}${ignored}<br>` +
       (info.blocked ? `Blocks ${info.blocked} of ${info.total} cards.` : 'Blocks none of Black’s cards.') +
       ` Black switches to <b>${S.kidLabel(kid)}</b> and next threatens <b>${goName(pv)}</b>.<br>` +
@@ -465,7 +465,7 @@
       const a = analysis(g), np = a.perfect.length;
       status.innerHTML = forced === 21 ? (a.everywhere ? 'Your move. Every reply keeps the 21 line here.' : `Your move. You are still on the 21 line; ${np} cell${np === 1 ? '' : 's'} keep${np === 1 ? 's' : ''} it.`)
         : `Your move. Perfect play from here makes Black finish on move ${forced}; <b>${21 - forced} lost</b>.`;
-      if (a.wins.length) status.innerHTML += ` Black could already win at ${a.wins.map(goName).join(' or ')} (green ring), but its plan won’t play there.`;
+      if (a.wins.length) status.innerHTML += ` Last turn Black could have won at ${a.wins.map(goName).join(' or ')} (green ring) and played elsewhere; its plan never plays there.`;
     } else {
       status.textContent = 'Your move. Click any empty point.';
     }

@@ -263,14 +263,36 @@
     // Free points where one more Black stone would complete Snaky. The card policy never looks
     // for these: it only plays its card's next stone, so it can leave a ready win on the board.
     winningPoints() {
+      // Only points within reach of a Black stone can complete a shape (Snaky spans 5x2).
+      const near = new Set();
+      for (const m of this.maker) for (let dx = -4; dx <= 4; dx++) for (let dy = -4; dy <= 4; dy++) {
+        const x = kx(m) + dx, y = ky(m) + dy;
+        if (this.inBoard(x, y)) near.add(key(x, y));
+      }
       const out = [];
-      for (let x = 0; x < this.size; x++) for (let y = 0; y < this.size; y++) {
-        const k = key(x, y);
+      for (const k of near) {
         if (!this.isFree(k)) continue;
         this.maker.add(k);
         if (this.findSnake(k)) out.push(k);
         this.maker.delete(k);
       }
+      return out;
+    }
+
+    // Winning points Black already had on its previous turn and passed over. (A winning point
+    // that Black's last stone just created is an ordinary threat, not an ignored win.)
+    ignoredWins() {
+      const last = [...this.history].reverse().find((h) => h.who === 'maker');
+      if (!last) return [];
+      this.maker.delete(last.cell);
+      const out = [];
+      for (const k of this.winningPoints()) {
+        if (k === last.cell) continue;
+        this.maker.add(k);
+        if (this.findSnake(k)) out.push(k);
+        this.maker.delete(k);
+      }
+      this.maker.add(last.cell);
       return out;
     }
 
