@@ -69,6 +69,14 @@ if that card already finishes in time, those replies need nothing more. Otherwis
 point of the certificate's 17×17 box grown by 4 (any Snaky with 4 or more Black stones lies inside it),
 plus one far-away reply standing for the rest. For N = 20 that fallback never triggers.
 
+## The certificate the site plays
+
+`certificate20-best.txt` (final card 757, 30 new cards) is the one behind https://kaiasage.github.io/snaky-demo/twenty/.
+It adds two single-stone cards of height 17 (738 and 749), found by `pns.mjs` for the diagonal and knight's-move first
+replies, so those games end by move 18; only the four adjacent first replies still take 20. Built with
+`EXTRA_CARDS=partial19-cards.txt node pns.mjs 20 50000 40 certificate20-best.txt` and checked with
+`python3 verify20.py certificate20-best.txt 20`.
+
 ## Toward 19
 
 The plan plus win-in-1 is refuted at 19, and no shortcut of depth ≤ 3 helps on the refuting line. About
