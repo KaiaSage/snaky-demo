@@ -137,8 +137,10 @@
 
   function stone(color, k, parent, opts = {}) {
     const x = px(S.kx(k)), y = py(S.ky(k));
-    const g = el('g', { class: opts.drop ? 'stone-drop' : '' }, parent);
-    if (!opts.ghost) el('circle', { cx: x + 1.8, cy: y + 2.6, r: 18.4, fill: 'rgba(30,15,0,.45)', filter: 'url(#shadow)' }, g);
+    const g = el('g', { class: opts.drop ? 'stone-drop' : opts.fall ? 'stone-fall' : '' }, parent);
+    if (opts.fall) g.style.animationDelay = opts.fall + 'ms';
+    if (opts.gift) el('circle', { cx: x + 1.5, cy: y + 2.2, r: 18.4, fill: 'rgba(30,15,0,.3)' }, g); // no blur: there can be hundreds
+    else if (!opts.ghost) el('circle', { cx: x + 1.8, cy: y + 2.6, r: 18.4, fill: 'rgba(30,15,0,.45)', filter: 'url(#shadow)' }, g);
     el('circle', { cx: x, cy: y, r: 18.6, fill: `url(#${color})`, opacity: opts.ghost ? 0.55 : 1 }, g);
     if (opts.num != null) {
       const t = el('text', { x, y: y + 5.2, 'text-anchor': 'middle', class: 'num', fill: color === 'black' ? '#f2f2f2' : '#1a1a1a' }, g);
@@ -152,7 +154,7 @@
   const replyCache = new WeakMap();
   function analysis(g) {
     // Breaker-to-move analysis of a game position (cached per cur object + stone count).
-    const sig = g.history.length;
+    const sig = g.history.length + ':' + g.breaker.size; // gift stones change the board without a move
     let c = replyCache.get(g.cur);
     if (c && c.sig === sig && c.policy === g.policy) return c;
     const rm = g.replyMap();
@@ -175,7 +177,9 @@
   function bestReply(g) {
     const a = analysis(g);
     // Prefer perfect replies inside the envelope so the demo stays readable.
-    const pool = a.perfect.length ? a.perfect : freeCellsOutside(g, a);
+    let pool = a.perfect.length ? a.perfect : freeCellsOutside(g, a);
+    if (!pool.length) pool = [...a.map.keys()]; // bad manners can leave only the envelope free
+    if (!pool.length) for (let x = 0; x < N; x++) for (let y = 0; y < N; y++) if (g.isFree(S.key(x, y))) pool.push(S.key(x, y));
     return pool[Math.floor(Math.random() * pool.length)];
   }
   function replyInfo(g, k) {
@@ -244,6 +248,13 @@
       stone(o.who === 'maker' ? 'black' : 'white', k, gStones, { num: st.numbers ? o.n : null, drop: k === last && st.review == null && st.justPlaced === k });
     }
     st.justPlaced = null;
+    // Gift stones (bad manners): White stones that are not moves in the record.
+    for (const k of g.breaker) {
+      if (order.has(k)) continue;
+      const isNew = st.newGifts && st.newGifts.has(k);
+      stone('white', k, gStones, { gift: true, fall: isNew ? 30 + Math.floor(Math.random() * 650) : 0 });
+    }
+    st.newGifts = null;
     if (last != null && !st.numbers) {
       const x = px(S.kx(last)), y = py(S.ky(last));
       el('circle', { cx: x, cy: y, r: 7, fill: 'none', stroke: order.get(last).who === 'maker' ? '#f4f2ea' : '#151515', 'stroke-width': 2 }, gMarks);
@@ -685,11 +696,51 @@
       st.justPlaced = mv.cell;
       st.busy = false;
       clack(true);
-      if (st.game.won) onWin();
+      if (st.game.won) onWin(); else giveGifts();
       render();
       if (st.auto && !st.game.won) st.autoTimer = setTimeout(autoStep, 520);
     }, reduceMotion() ? 0 : delay);
   }
+  // ---------------------------------------------------------------- bad manners
+  // Every empty point outside the current claim's envelope T goes to White. By the paper's Lemma 3 a White stone
+  // outside T cannot affect Black's plan, so these are real stones and still change nothing.
+  const TAUNTS = [
+    'Take all the stones you want. They won’t help.',
+    'Help yourself. Black wasn’t using those.',
+    'Have the rest of the board. Black only needs this bit.',
+    'Free stones! Still won’t help.',
+    'Generous, aren’t I? It changes nothing.',
+    'Go on, take another {n}. I’ll wait.',
+    '{n} more stones for you. Snaky doesn’t live out there.',
+    'Keep them. They’re outside the envelope anyway.',
+  ];
+  function giveGifts() {
+    const g = st.game;
+    if (!st.taunt || g.won || g.cur.node.base) return;
+    const T = new Set(g.claimCells().T);
+    const added = [];
+    for (let x = 0; x < N; x++) for (let y = 0; y < N; y++) {
+      const k = S.key(x, y);
+      if (g.isFree(k) && !T.has(k)) { g.breaker.add(k); added.push(k); }
+    }
+    if (!added.length) return;
+    st.newGifts = new Set(added);
+    let i = Math.floor(Math.random() * TAUNTS.length);
+    if (i === st.lastTaunt) i = (i + 1) % TAUNTS.length; // never the same line twice in a row
+    st.lastTaunt = i;
+    const msg = TAUNTS[i].replace('{n}', added.length);
+    const t = $('taunt');
+    t.hidden = true; void t.offsetWidth; // restart the fade
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(st.tauntTimer); st.tauntTimer = setTimeout(() => { t.hidden = true; }, 3300);
+    if (!reduceMotion()) for (let i = 1; i <= Math.min(10, added.length); i++) setTimeout(() => clack(false), 40 + i * 55);
+  }
+  function takeGiftsBack() {
+    const g = st.game;
+    const moves = new Set(g.history.filter((h) => h.who === 'breaker').map((h) => h.cell));
+    for (const k of [...g.breaker]) if (!moves.has(k)) g.breaker.delete(k);
+  }
+
   const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function breakerPlay(k) {
@@ -821,6 +872,13 @@
   }
   $('mode-glass').onclick = () => setMode('glass');
   $('mode-blind').onclick = () => setMode('blind');
+  $('opt-taunt').checked = st.taunt = store.get('taunt', false);
+  $('opt-taunt').onchange = (e) => {
+    st.taunt = e.target.checked; store.set('taunt', st.taunt);
+    if (st.review != null || st.busy || st.game.won) return;
+    if (st.taunt) giveGifts(); else takeGiftsBack();
+    render();
+  };
   $('opt-sound').checked = st.sound;
   $('opt-sound').onchange = (e) => { st.sound = e.target.checked; store.set('sound', st.sound); };
   $('opt-numbers').onchange = (e) => { st.numbers = e.target.checked; renderBoard(); };
