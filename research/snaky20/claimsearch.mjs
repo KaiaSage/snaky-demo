@@ -70,6 +70,31 @@ export function claims(M, B, tNow, tNext) {
       }
     }
   }
+  // Wider moves (WIDE=1): a single-requirement card can be placed on any empty point, so nearby quiet
+  // moves get claims too (in practice only early, while such cards are short enough).
+  if (process.env.WIDE === '1') {
+    const near = new Set();
+    for (const m of [...M, ...B]) for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
+      const k = S.key(S.kx(m) + dx, S.ky(m) + dy);
+      if (!M.has(k) && !B.has(k)) near.add(k);
+    }
+    for (const e of pool) {
+      if (e.h > tNext) break;
+      if (e.A.length !== 1) continue;
+      for (const R of RS) {
+        const [ax, ay] = S.apply(R, ...e.A[0]);
+        for (const p of near) {
+          const F = { a: R.a, b: R.b, c: R.c, d: R.d, tx: S.kx(p) - ax, ty: S.ky(p) - ay };
+          let ok = true;
+          for (const b of B) { const q = S.invertPoint(F, S.kx(b), S.ky(b)); if (e.T.has(S.key(q[0], q[1]))) { ok = false; break; } }
+          if (!ok) continue;
+          let arr = byP.get(p);
+          if (!arr) byP.set(p, (arr = []));
+          arr.push({ node: e.node, F, h: e.h });
+        }
+      }
+    }
+  }
   return { now, byP };
 }
 export const placedT = (c) => { if (!c._T) { c._T = new Set(); for (const k of c.node.T) c._T.add(S.applyKey(c.F, k)); } return c._T; };
