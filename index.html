@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snaky in 21</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-text">
+      <p class="eyebrow">Maker–Breaker · the Snaky hexomino · 728 proof cards</p>
+      <h1>Snaky in <span class="seal">21</span></h1>
+      <p class="lede">You play White, the Breaker. Black plays the strategy from
+        <a href="https://github.com/openai/math/blob/main/preprints/Snaky-in-21-Maker-moves-September-25-2026/article.pdf" target="_blank" rel="noopener">“Snaky in 21 Maker moves”</a>
+        and is building the six-stone Snaky shape in any rotation or reflection. It always succeeds. The only question is how long you can make it take.</p>
+    </div>
+    <figure class="snaky-figure" aria-label="The Snaky hexomino">
+      <svg viewBox="0 0 220 96" role="img" aria-hidden="true">
+        <g class="fig-grid"></g>
+      </svg>
+      <figcaption>S = {(0,0),(1,0),(2,0),(3,0),(3,1),(4,1)}</figcaption>
+    </figure>
+  </header>
+
+  <main class="play">
+    <section class="board-col" aria-label="Board">
+      <div class="board-shell">
+        <svg id="board" class="board" role="application" aria-label="19 by 19 Go board"></svg>
+        <div id="tip" class="tip" hidden></div>
+        <div id="banner" class="banner" hidden></div>
+      </div>
+      <div class="board-foot">
+        <span id="legend" class="legend">
+          <span class="lg"><i class="sw sw-env"></i>envelope T</span>
+          <span class="lg"><i class="sw sw-heat1"></i>delays Maker</span>
+          <span class="lg"><i class="sw sw-heat2"></i>keeps the 21 line</span>
+          <span class="lg"><i class="sw sw-pivot"></i>Maker's next threat</span>
+        </span>
+      </div>
+    </section>
+
+    <aside class="panel" aria-label="Game panel">
+      <div class="modes" role="tablist" aria-label="Mode">
+        <button id="mode-glass" role="tab" class="mode" aria-selected="true">Glass box</button>
+        <button id="mode-blind" role="tab" class="mode" aria-selected="false">Blind</button>
+      </div>
+      <p id="mode-note" class="mode-note"></p>
+
+      <div class="clock">
+        <div class="clock-top">
+          <div>
+            <div class="label">Maker stones</div>
+            <div class="big"><span id="moves">1</span><span class="of"> / 21</span></div>
+          </div>
+          <div class="forced-box" id="forced-box">
+            <div class="label">Perfect defense from here</div>
+            <div class="big small"><span id="forced">21</span></div>
+          </div>
+        </div>
+        <div id="pips" class="pips" aria-hidden="true"></div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </div>
+
+      <div class="controls">
+        <button id="btn-undo" class="btn">Undo</button>
+        <button id="btn-hint" class="btn">Hint</button>
+        <button id="btn-auto" class="btn">Watch perfect defense</button>
+        <button id="btn-new" class="btn btn-primary">New game</button>
+      </div>
+
+      <details class="opts">
+        <summary>Options</summary>
+        <label class="opt"><input type="checkbox" id="opt-numbers" checked> Move numbers on stones</label>
+        <label class="opt"><input type="checkbox" id="opt-heatnums"> Show Maker's finishing move on every hot cell</label>
+        <label class="opt"><input type="checkbox" id="opt-paper"> Literal paper policy (first surviving card, replacement moves)</label>
+      </details>
+
+      <section id="glass" class="glass">
+        <h2>Maker's hand</h2>
+        <p class="hand-note" id="hand-note"></p>
+        <div id="cards" class="cards"></div>
+        <h2>Proof path</h2>
+        <ol id="path" class="path"></ol>
+      </section>
+
+      <section class="kifu-sec">
+        <h2>Game record</h2>
+        <ol id="kifu" class="kifu"></ol>
+      </section>
+
+      <section id="review" class="review" hidden>
+        <h2>Review</h2>
+        <div class="review-row">
+          <button id="rv-prev" class="btn" aria-label="Previous reply">◀</button>
+          <input type="range" id="rv-slider" min="0" max="0" value="0" aria-label="Reply to review">
+          <button id="rv-next" class="btn" aria-label="Next reply">▶</button>
+        </div>
+        <p id="rv-text" class="rv-text"></p>
+        <button id="rv-exit" class="btn">Back to final position</button>
+      </section>
+    </aside>
+  </main>
+
+  <section class="explain">
+    <div class="explain-text">
+      <h2>How Black thinks</h2>
+      <p>The paper proves the result with <em>cards</em>. A card is a promise of the form: if Black already owns the
+        required cells <b>A</b> and White has no stone in the envelope <b>T</b>, Black wins within <b>h</b> more moves.
+        Cards 0–5 are the six ways to be one stone from Snaky. Every later card plays one <em>pivot</em> stone and holds a hand of
+        child cards whose envelopes have nothing in common except cells Black already owns. So whatever White replies,
+        at least one child card survives, and its height is smaller.</p>
+      <p>The final card, 727, needs nothing (A = ∅), fits in a 17×17 square (|T| = 251), and has height 21. Its pivot is
+        the paper's (8,8), which on this board is tengen, the centre point K10. In glass-box mode, every hot cell on the
+        board is a reply that kills the fastest cards in Black's hand.</p>
+      <p class="fact" id="fact"></p>
+    </div>
+  </section>
+
+  <section class="lab">
+    <div class="lab-card">
+      <h2>The squeeze</h2>
+      <p>Card 727 is a hand of 32 placed cards in six groups (Table 1 of the paper). Step through them and watch
+        their common envelope shrink until only the pivot is left. That is why Black needs nothing to start.</p>
+      <div class="squeeze">
+        <canvas id="sq-canvas" width="340" height="340" aria-label="Intersection of child envelopes"></canvas>
+        <div class="sq-side">
+          <div class="label">Children combined</div>
+          <div class="big"><span id="sq-k">0</span><span class="of"> / 32</span></div>
+          <div class="label">Common cells besides (8,8)</div>
+          <div class="big small"><span id="sq-left">250</span></div>
+          <div id="sq-card" class="mono sq-cardname">all of T₇₂₇</div>
+          <input type="range" id="sq-slider" min="0" max="32" value="0" aria-label="Number of children combined">
+          <button id="sq-play" class="btn">Play</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="lab-card">
+      <h2>Card browser</h2>
+      <p>Open any of the 728 cards. Black stones are required cells, squares are the envelope, the red ring is the pivot.
+        Click a child to follow it down.</p>
+      <div class="cb-bar">
+        <label for="cb-input" class="label">Card</label>
+        <input id="cb-input" type="number" min="0" max="727" value="6">
+        <button id="cb-go" class="btn">Open</button>
+        <button id="cb-rand" class="btn">Random</button>
+        <button id="cb-back" class="btn" disabled>Back</button>
+      </div>
+      <div class="cb-body">
+        <canvas id="cb-canvas" width="300" height="300" aria-label="Card diagram"></canvas>
+        <div class="cb-info">
+          <div id="cb-title" class="cb-title"></div>
+          <dl id="cb-stats" class="cb-stats"></dl>
+          <div id="cb-kids" class="cb-kids"></div>
+        </div>
+      </div>
+      <pre id="cb-line" class="cb-line"></pre>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>Strategy data: Appendix D of the article, reproduced byte for byte (SHA-256 3fa12d36…3d04). Everything runs in your
+      browser: the page rebuilds all 728 cards on load and checks them against the paper's stated values.</p>
+  </footer>
+</div>
+
+<script src="js/certificate.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
