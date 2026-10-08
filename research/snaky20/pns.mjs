@@ -9,6 +9,8 @@
 // Usage: node pns.mjs <goal> [maxExpansions=20000] [maxK=40] [out.txt] [dx,dy]
 //   With dx,dy, proves only the position after Black (8,8) and White (8+dx, 8+dy), within goal-1 moves
 //   (by symmetry one reply per type covers them all).
+//   With pos:x,y;x,y|x,y;x,y|t instead, proves that Black (first list) to move against White (second list)
+//   wins within t moves (certificate coordinates).
 import { writeFileSync } from 'node:fs';
 import { S, OFF, extraLines } from './lib.mjs';
 import { pool, RS, claims, placedT, makeCard, lines } from './claimsearch.mjs';
@@ -17,7 +19,8 @@ const GOAL = +(process.argv[2] || 19);
 const MAX_EXP = +(process.argv[3] || 20000);
 const MAX_K = +(process.argv[4] || 40);
 const OUT = process.argv[5] || '';
-const ONLY = process.argv[6] ? process.argv[6].split(',').map(Number) : null;
+const POS = process.argv[6] && process.argv[6].startsWith('pos:') ? process.argv[6].slice(4).split('|') : null;
+const ONLY = process.argv[6] && !POS ? process.argv[6].split(',').map(Number) : null;
 const INF = 1e12;
 
 const keyOf = (M, B, t) => [...M].sort((a, b) => a - b).join(',') + '|' + [...B].sort((a, b) => a - b).join(',') + '|' + t;
@@ -124,6 +127,22 @@ if (ONLY) { // a single first reply: make it the only child of the root move
   const b = S.key(S.kx(first) + ONLY[0], S.ky(first) + ONLY[1]);
   if (!K.includes(b)) throw new Error('that reply is already covered by a claim');
   rootAnd.K = [b]; rootAnd.pn = 1;
+}
+if (POS) {
+  const cells = (str) => new Set(str.split(';').filter(Boolean).map((xy) => { const [x, y] = xy.split(',').map(Number); return S.key(x + OFF, y + OFF); }));
+  const sub = orNode(cells(POS[0]), cells(POS[1]), +POS[2]);
+  const t1 = Date.now(); let last = 0;
+  while (sub.pn !== 0 && sub.dn !== 0 && expansions < MAX_EXP) {
+    if (!sub.children && !sub.leaf) expandOr(sub); else iterate(sub);
+    update(sub);
+    if (expansions - last >= 500) { last = expansions; console.log(`  ${expansions} expansions, ${((Date.now() - t1) / 1000).toFixed(0)}s: pn ${sub.pn} dn ${sub.dn}`); }
+  }
+  if (sub.pn === 0) {
+    const c = claimOf(sub);
+    console.log(`PROVED position within ${POS[2]}: claim height ${c.h}, ${lines.length} new cards, final ${c.node.newId ?? 'existing card'} (${expansions} expansions)`);
+    if (OUT) { writeFileSync(OUT, [globalThis.SNAKY_CERTIFICATE.trim(), ...extraLines, ...lines].join('\n') + '\n'); console.log('wrote ' + OUT); }
+  } else console.log(sub.dn === 0 ? `REFUTED position within ${POS[2]} (${expansions} expansions)` : `undecided after ${expansions} expansions: pn ${sub.pn} dn ${sub.dn}`);
+  process.exit(0);
 }
 console.log(`goal ${GOAL}: ${rootAnd.K.length} White replies to search after Black's first stone`);
 const t0 = Date.now();
