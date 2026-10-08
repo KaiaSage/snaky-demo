@@ -38,6 +38,20 @@ node tools/check.mjs      # rebuilds the certificate and compares with the paper
 node tools/simulate.mjs   # plays random, envelope-only and perfect White against both policies
 ```
 
+## Playing from a terminal (or letting an agent play)
+
+`tools/play-blind.mjs` is a text version of Blind mode: it shows only the stones, one move per call.
+
+```
+node tools/play-blind.mjs game.json        # show the board; a missing file starts a new game
+node tools/play-blind.mjs game.json K11    # play White at K11, Black replies
+node tools/play-blind.mjs game.json --sgf  # export, then paste into the page's SGF box to review
+```
+
+To have an AI agent play blind, give it the rules and this command, and ask it not to read any files in the repo:
+the certificate and engine sit next to the harness, so playing blind is on the honour system. A Claude subagent
+playing three games this way scored 13, 9 and 11.
+
 ## Credits
 
 The proof and certificate are from “Snaky in 21 Maker moves” (OpenAI, 2026), produced by an unreleased OpenAI model.
