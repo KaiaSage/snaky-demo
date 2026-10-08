@@ -44,6 +44,7 @@
         <svg id="board" class="board" role="application" aria-label="19 by 19 Go board"></svg>
         <div id="tip" class="tip" hidden></div>
         <div id="banner" class="banner" hidden></div>
+        <div id="taunt" class="taunt" aria-live="polite" hidden></div>
       </div>
       <div class="board-foot">
         <span id="legend" class="legend">
@@ -121,6 +122,7 @@
         <summary>Options</summary>
         <label class="opt"><input type="checkbox" id="opt-numbers" checked> Move numbers on stones</label>
         <label class="opt"><input type="checkbox" id="opt-sound" checked> Stone sounds</label>
+        <label class="opt"><input type="checkbox" id="opt-taunt"> Bad manners: after each of Black’s moves, White gets every point Black doesn’t need</label>
         <label class="opt"><input type="checkbox" id="opt-heatnums"> Show Maker's finishing move on every hot cell</label>
         <label class="opt"><input type="checkbox" id="opt-paper"> Literal paper policy (first surviving card, replacement moves)</label>
       </details>
