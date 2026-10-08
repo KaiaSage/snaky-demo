@@ -217,4 +217,21 @@ h1 { font-size: clamp(2.4rem, 6vw, 4.2rem); font-weight: 800; line-height: 1; le
 .cb-line { margin: 0; font-family: var(--f-mono); font-size: .72rem; white-space: pre-wrap; word-break: break-word; max-height: 140px; overflow: auto;
   background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 8px; color: var(--ink-soft); }
 .foot { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); font-size: .8rem; color: var(--ink-soft); }
-.foot p { margin: 0; max-width: 90ch; }
+.foot { display: grid; gap: 10px; }
+.foot h2 { color: var(--ink); }
+.credits { display: grid; grid-template-columns: 8.5em minmax(0, 1fr); gap: 8px 16px; margin: 0; max-width: 100ch; line-height: 1.5; }
+.credits dt { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; padding-top: .15em; }
+.credits dd { margin: 0; color: var(--ink); opacity: .85; }
+@media (max-width: 560px) { .credits { grid-template-columns: minmax(0, 1fr); gap: 2px; } .credits dd { margin-bottom: 8px; } }
+.tempo { margin: 0; display: grid; gap: 2px; }
+.tempo svg { width: 100%; height: auto; display: block; cursor: pointer; }
+.tempo text { font-family: var(--f-mono); font-size: 11px; fill: var(--ink-soft); }
+.tempo .t-line { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.tempo .t-area { fill: var(--ai-soft); }
+.tempo .t-grid { stroke: var(--line); stroke-width: 1; }
+.tempo .t-ok { fill: var(--paper); stroke: var(--ink); stroke-width: 2; }
+.tempo .t-loss { fill: var(--shu); stroke: var(--paper); stroke-width: 2; }
+.tempo .t-cur { stroke: var(--ai); stroke-width: 2; stroke-dasharray: 3 3; }
+.tempo .t-hover { stroke: var(--ink-soft); stroke-width: 1; }
+.tempo .t-lab { fill: var(--ink); font-weight: 500; }
+.tempo-cap { font-size: .8rem; color: var(--ink-soft); min-height: 1.4em; }

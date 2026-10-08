@@ -58,6 +58,10 @@
           <h2>Game record</h2>
           <span id="kifu-hint" class="kifu-hint"></span>
         </div>
+        <figure id="tempo" class="tempo" hidden>
+          <svg id="tempo-svg" viewBox="0 0 640 132" role="img" aria-label="Perfect-defense finishing move after each White reply"></svg>
+          <figcaption id="tempo-cap" class="tempo-cap"></figcaption>
+        </figure>
         <ol id="kifu" class="kifu"></ol>
         <details class="sgf" id="sgf-box">
           <summary>SGF</summary>
@@ -104,6 +108,7 @@
       <details class="opts">
         <summary>Options</summary>
         <label class="opt"><input type="checkbox" id="opt-numbers" checked> Move numbers on stones</label>
+        <label class="opt"><input type="checkbox" id="opt-sound" checked> Stone sounds</label>
         <label class="opt"><input type="checkbox" id="opt-heatnums"> Show Maker's finishing move on every hot cell</label>
         <label class="opt"><input type="checkbox" id="opt-paper"> Literal paper policy (first surviving card, replacement moves)</label>
       </details>
@@ -182,8 +187,26 @@
   </section>
 
   <footer class="foot">
-    <p>Strategy data: Appendix D of the article, reproduced byte for byte (SHA-256 3fa12d36…3d04). Everything runs in your
-      browser: the page rebuilds all 728 cards on load and checks them against the paper's stated values.</p>
+    <h2>Credits</h2>
+    <dl class="credits">
+      <dt>The proof</dt>
+      <dd><a href="https://github.com/openai/math/blob/main/preprints/Snaky-in-21-Maker-moves-September-25-2026/article.pdf" target="_blank" rel="noopener">“Snaky in 21 Maker moves”</a>,
+        OpenAI, 25 September 2026, produced by an unreleased OpenAI model. The 728-card certificate Black plays here is its Appendix D,
+        reproduced byte for byte (SHA-256 3fa12d36…3d04) and rebuilt in your browser on every load.</dd>
+      <dt>The method</dt>
+      <dd>Nándor Sieben, whose proof trees for weak achievement games (<i>Integers</i> 8, 2008) are the direct ancestor of the cards,
+        and whose <i>Snaky is a 41-dimensional winner</i> (2004) set out the problem’s history.</dd>
+      <dt>The problem</dt>
+      <dd>Frank Harary, who introduced polyomino achievement games.
+        Harary, Harborth and Seemann, for handicap-two strategies.
+        Immanuel Halupczok and Jan-Christoph Schlage-Puchta (<i>Achieving Snaky</i>, 2007): Snaky wins in three dimensions, loses on an 8×8 board, and has handicap number at most one.
+        Hiro Ito and Hiromitsu Miyagawa: a handicap-one win (2007).
+        András Csernenszky, Ryan R. Martin and András Pluhár: Breaker has no pairing defence (2011).
+        Irfansha Shaik, Valentin Mayer-Eichberger, Jaco van de Pol and Abdallah Saffidine, and Steve Boucher and Roger Villemaire, for QBF encodings of these games.</dd>
+      <dt>This demo</dt>
+      <dd>Designed and built by Claude (Anthropic) in Claude Code. Board, engine, heatmap and snake are plain JavaScript with no server.
+        Type: Shippori Mincho B1, Zen Kaku Gothic New and IBM Plex Mono.</dd>
+    </dl>
   </footer>
 </div>
 

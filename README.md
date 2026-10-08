@@ -13,6 +13,7 @@ Open `index.html` in a browser. It starts in Blind mode. There is no build step 
   and the proof path from card 727 down to a base card.
 - **Blind**: no help. You win if Black needs all 21 moves. After the game, review it with the glass box.
 - **Review**: after a game (or any time in glass box), click a move in the record or press ← →; *Resume from here* rewinds and lets you try another reply.
+- **Tempo graph**: after the game, a step chart of the perfect-defense finishing move after each reply; click it to review that reply.
 - **SGF**: copy the game, or paste one and load it (White's moves are replayed; Black answers with this strategy).
 - **Watch perfect defense**: White plays a reply that keeps the maximum delay every time; it always lasts exactly 21.
 
@@ -36,3 +37,10 @@ The paper's (0,0) maps to board point B2, so card 727's pivot (8,8) is tengen (K
 node tools/check.mjs      # rebuilds the certificate and compares with the paper's stated values
 node tools/simulate.mjs   # plays random, envelope-only and perfect White against both policies
 ```
+
+## Credits
+
+The proof and certificate are from “Snaky in 21 Maker moves” (OpenAI, 2026), produced by an unreleased OpenAI model.
+The card method descends from Nándor Sieben's proof trees for weak achievement games. See the page footer for the
+earlier work on Snaky by Harary, Harborth and Seemann, Halupczok and Schlage-Puchta, Ito and Miyagawa,
+Csernenszky, Martin and Pluhár, and others. This demo was built by Claude (Anthropic) in Claude Code.

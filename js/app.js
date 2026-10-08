@@ -44,7 +44,50 @@
     lastMaker: null,
     hintCell: null,
     best: store.get('best', 0),
+    sound: store.get('sound', true),
   };
+
+  // ---------------------------------------------------------------- sound
+  // Synthesised so nothing has to load: a wooden clack for stones, a hiss for the snake.
+  let actx = null;
+  function audio() {
+    if (!st.sound) return null;
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      return actx;
+    } catch (e) { return null; }
+  }
+  function noise(ctx, secs, shape) {
+    const n = Math.floor(ctx.sampleRate * secs);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * shape(i / n);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    return src;
+  }
+  function clack(black) {
+    const ctx = audio(); if (!ctx) return;
+    const t = ctx.currentTime;
+    const src = noise(ctx, 0.07, (u) => Math.exp(-u * 9));
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = black ? 1500 : 1900; bp.Q.value = 1.4;
+    const g = ctx.createGain(); g.gain.value = 0.55;
+    src.connect(bp).connect(g).connect(ctx.destination);
+    const o = ctx.createOscillator(); o.frequency.setValueAtTime(black ? 190 : 230, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.06);
+    const og = ctx.createGain(); og.gain.setValueAtTime(0.35, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    o.connect(og).connect(ctx.destination);
+    src.start(t); o.start(t); o.stop(t + 0.08);
+  }
+  function hiss() {
+    const ctx = audio(); if (!ctx) return;
+    const t = ctx.currentTime + 0.9;
+    const src = noise(ctx, 0.9, (u) => Math.min(1, u * 8) * (1 - u));
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 4200;
+    const g = ctx.createGain(); g.gain.value = 0.18;
+    src.connect(hp).connect(g).connect(ctx.destination);
+    src.start(t);
+  }
 
   // ---------------------------------------------------------------- board skeleton
   const svg = $('board');
@@ -480,6 +523,65 @@
 
   const canReview = () => !!st.game.won || st.mode === 'glass';
 
+  // ---------------------------------------------------------------- tempo graph
+  // After each White reply: the move on which Black finishes if White defends perfectly from then on.
+  const TG = { w: 640, h: 132, l: 34, r: 14, t: 12, b: 24 };
+  function renderTempo() {
+    const fig = $('tempo');
+    const n = st.log.length;
+    fig.hidden = !(canReview() && n);
+    if (fig.hidden) return;
+    const svgT = $('tempo-svg');
+    clear(svgT);
+    const vals = [21, ...st.log.map((e) => e.after)];
+    const lo = Math.max(1, Math.min(...vals) - 1);
+    const X = (i) => TG.l + (i / Math.max(n, 1)) * (TG.w - TG.l - TG.r);
+    const Y = (v) => TG.t + ((21 - v) / Math.max(21 - lo, 1)) * (TG.h - TG.t - TG.b);
+    const ticks = [...new Set([21, vals[vals.length - 1], lo + 1])].filter((v) => v >= lo && v <= 21);
+    for (const v of ticks) {
+      el('line', { x1: TG.l, x2: TG.w - TG.r, y1: Y(v), y2: Y(v), class: 't-grid' }, svgT);
+      el('text', { x: TG.l - 6, y: Y(v) + 4, 'text-anchor': 'end' }, svgT).textContent = v;
+    }
+    const xl = el('text', { x: TG.l, y: TG.h - 6 }, svgT); xl.textContent = 'White reply →';
+    // step line: the value holds until the next reply changes it
+    let d = `M${X(0)},${Y(vals[0])}`;
+    for (let i = 1; i < vals.length; i++) d += ` H${X(i)} V${Y(vals[i])}`;
+    el('path', { d: d + ` V${Y(lo)} H${X(0)} Z`, class: 't-area' }, svgT);
+    el('path', { d, class: 't-line' }, svgT);
+    if (st.review != null) el('line', { x1: X(st.review + 1), x2: X(st.review + 1), y1: TG.t, y2: TG.h - TG.b, class: 't-cur' }, svgT);
+    // markers: hollow = held the line, vermilion = lost moves; label the single biggest loss
+    let worst = -1, worstLoss = 0;
+    st.log.forEach((e, i) => {
+      const loss = e.before - e.after;
+      if (loss > worstLoss) { worstLoss = loss; worst = i; }
+      el('circle', { cx: X(i + 1), cy: Y(e.after), r: n > 40 ? 3 : 4.5, class: loss ? 't-loss' : 't-ok' }, svgT);
+    });
+    if (worst >= 0) {
+      const tx = el('text', { x: X(worst + 1), y: Y(st.log[worst].after) + 16, 'text-anchor': 'middle', class: 't-lab' }, svgT);
+      tx.textContent = `−${worstLoss}`;
+    }
+    const hoverLine = el('line', { y1: TG.t, y2: TG.h - TG.b, class: 't-hover', visibility: 'hidden' }, svgT);
+    const cap = $('tempo-cap');
+    const idle = () => {
+      const lost = 21 - vals[vals.length - 1];
+      cap.textContent = lost ? `Each step down is a reply that let Black finish sooner: ${lost} move${lost > 1 ? 's' : ''} lost in total. Click the graph to review a reply.`
+        : 'Every reply so far held the 21 line. Click the graph to review a reply.';
+    };
+    idle();
+    const pick = (ev) => {
+      const pt = svgT.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+      const p = pt.matrixTransform(svgT.getScreenCTM().inverse());
+      return Math.max(0, Math.min(n - 1, Math.round((p.x - TG.l) / ((TG.w - TG.l - TG.r) / Math.max(n, 1))) - 1));
+    };
+    svgT.onpointermove = (ev) => {
+      const i = pick(ev), e = st.log[i], loss = e.before - e.after;
+      hoverLine.setAttribute('x1', X(i + 1)); hoverLine.setAttribute('x2', X(i + 1)); hoverLine.setAttribute('visibility', 'visible');
+      cap.textContent = `Reply ${i + 1}, White ${goName(e.cell)}: ${loss ? `lost ${loss}` : 'held'}. Perfect defence from there ends on move ${e.after}.`;
+    };
+    svgT.onpointerleave = () => { hoverLine.setAttribute('visibility', 'hidden'); idle(); };
+    svgT.onclick = (ev) => startReview(pick(ev));
+  }
+
   // ---------------------------------------------------------------- SGF
   const sgfCoord = (k) => String.fromCharCode(97 + S.kx(k)) + String.fromCharCode(97 + N - 1 - S.ky(k));
   function toSGF() {
@@ -548,6 +650,7 @@
     renderBoard();
     renderPanel();
     renderReview();
+    renderTempo();
   }
 
   // ---------------------------------------------------------------- game flow
@@ -568,6 +671,7 @@
       st.lastMaker = mv;
       st.justPlaced = mv.cell;
       st.busy = false;
+      clack(true);
       if (st.game.won) onWin();
       render();
       if (st.auto && !st.game.won) st.autoTimer = setTimeout(autoStep, 520);
@@ -579,6 +683,7 @@
     const g = st.game;
     if (st.busy || g.won || st.review != null || !g.isFree(k)) return;
     recordBreaker(k);
+    clack(false);
     st.hover = null; st.hintCell = null;
     st.justPlaced = k;
     makerTurn();
@@ -606,6 +711,7 @@
 
   function onWin() {
     st.snakeFresh = true;
+    hiss();
     const m = st.game.won.moves;
     const watched = st.autoUsed;
     if (st.mode === 'blind' && !watched && m > st.best) { st.best = m; store.set('best', m); }
@@ -702,6 +808,8 @@
   }
   $('mode-glass').onclick = () => setMode('glass');
   $('mode-blind').onclick = () => setMode('blind');
+  $('opt-sound').checked = st.sound;
+  $('opt-sound').onchange = (e) => { st.sound = e.target.checked; store.set('sound', st.sound); };
   $('opt-numbers').onchange = (e) => { st.numbers = e.target.checked; renderBoard(); };
   $('opt-heatnums').onchange = (e) => { st.heatNums = e.target.checked; renderBoard(); };
   $('opt-paper').onchange = (e) => { st.policy = e.target.checked ? 'paper' : 'smart'; newGame(); };
