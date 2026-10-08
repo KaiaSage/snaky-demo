@@ -58,6 +58,11 @@ To have an AI agent play blind, give it the rules and this command, and ask it n
 the certificate and engine sit next to the harness, so playing blind is on the honour system. A Claude subagent
 playing three games this way scored 13, 9 and 11.
 
+## Playing over plain HTTP
+
+`worker/` is a Cloudflare Worker for agents that can fetch URLs but can't run code: each GET returns the board as
+text plus a link for every legal reply. See [worker/README.md](worker/README.md) for routes and deployment.
+
 ## Credits
 
 The proof and certificate are from “Snaky in 21 Maker moves” (OpenAI, 2026), produced by an unreleased OpenAI model.
