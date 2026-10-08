@@ -71,7 +71,6 @@
     });
 
     let nodeCount = 0;
-    const nodes = [];
     function expr(it, cardId, depth) {
       const p = point(it.next());
       const node = { base: false, card: cardId, depth, p, kids: [], uid: nodeCount++ };
@@ -116,7 +115,6 @@
       for (const k of inter) A.add(k);
       A.delete(pk);
       node.A = A; node.T = T; node.h = h + 1;
-      nodes.push(node);
       return node;
     }
 
@@ -132,7 +130,7 @@
       if (i !== words.length) throw new Error('trailing tokens in card ' + id);
       cards.push({ id, text: line, root });
     }
-    return { cards, nodeCount, nodes };
+    return { cards, nodeCount };
   }
 
   // ---------------------------------------------------------------------
@@ -186,24 +184,6 @@
     }
     node.V = V + 1;
     node.Vf = Vf + 1;
-  }
-
-  // Every certified claim as a pattern Black can match: the stones it needs at Breaker's
-  // turn (A plus the pivot, or all of S for a base) and the moves it still guarantees.
-  const RS = Array.from({ length: 8 }, (_, s) => codeTransform(s, 0, 0));
-  function claimPool(cert) {
-    if (cert.pool) return cert.pool;
-    const pool = [];
-    const roots = new Set(cert.cards.map((c) => c.root));
-    const add = (node, reqKeys, left) => {
-      const req = reqKeys.map((k) => [kx(k), ky(k)]);
-      const label = roots.has(node) ? String(node.card) : node.card + '(' + SYM[node.p[0]] + SYM[node.p[1]] + ' …)';
-      pool.push({ node, req, left, label });
-    };
-    for (let j = 0; j < 6; j++) add(cert.cards[j].root, [...cert.cards[j].root.T], 0);
-    for (const n of cert.nodes) add(n, [...n.A, key(n.p[0], n.p[1])], n.V - 1);
-    pool.sort((a, b) => a.left - b.left);
-    return (cert.pool = pool);
   }
 
   // Inline expressions are named by their card and pivot, e.g. 708(87 …).
@@ -359,60 +339,6 @@
       }
       this.history.push({ who: 'breaker', cell: b, blocked: info.blocked.length, of: prev.node.kids.length });
       return info;
-    }
-
-    // With Black to move: for every empty point X, the best claim in the whole certificate
-    // that holds at Breaker's turn if Black plays X (Lemma 3's Breaker-turn form).
-    // Returns Map(X -> {left, node, F, label}); left 0 means X completes Snaky.
-    coverMap() {
-      const M = this.maker, B = this.breaker, out = new Map();
-      const Mlist = [...M];
-      const record = (X, entry, F) => {
-        const cur = out.get(X);
-        if (!cur || entry.left < cur.left) out.set(X, { left: entry.left, node: entry.node, F, label: entry.label });
-      };
-      const empties = [];
-      for (let x = 0; x < this.size; x++) for (let y = 0; y < this.size; y++) { const k = key(x, y); if (this.isFree(k)) empties.push(k); }
-      for (const entry of claimPool(this.cert)) {
-        for (const R of RS) {
-          const rq = entry.req.map(([x, y]) => apply(R, x, y));
-          const ts = [];
-          if (rq.length >= 2) {
-            for (const m of Mlist) for (const a of [rq[0], rq[1]]) ts.push([kx(m) - a[0], ky(m) - a[1]]);
-          } else {
-            for (const e of empties) ts.push([kx(e) - rq[0][0], ky(e) - rq[0][1]]);
-          }
-          for (const [tx, ty] of ts) {
-            let missing = null, ok = true;
-            for (const [x, y] of rq) {
-              const k = key(x + tx, y + ty);
-              if (M.has(k)) continue;
-              if (missing !== null || B.has(k) || !this.inBoard(x + tx, y + ty)) { ok = false; break; }
-              missing = k;
-            }
-            if (!ok) continue;
-            const F = { a: R.a, b: R.b, c: R.c, d: R.d, tx, ty };
-            for (const b of B) {
-              const q = invertPoint(F, kx(b), ky(b));
-              if (entry.node.T.has(key(q[0], q[1]))) { ok = false; break; }
-            }
-            if (!ok) continue;
-            if (missing === null) { for (const e of empties) record(e, entry, F); } else record(missing, entry, F);
-          }
-        }
-      }
-      return out;
-    }
-
-    // Black plays X instead of the policy's move and adopts a covering claim from coverMap.
-    playMakerAt(X, claim) {
-      this.maker.add(X);
-      this.makerMoves++;
-      this.cur = { node: claim.node, F: claim.F, label: claim.label };
-      this.path.push({ ...this.cur, via: claim.label + ' ⟵ your Black move', free: false, whatIf: true });
-      this.history.push({ who: 'maker', cell: X, descents: [], replacement: false, whatIf: true, label: claim.label, node: claim.node });
-      const snake = this.findSnake(X);
-      if (snake) this.won = { snake, moves: this.makerMoves };
     }
 
     // Moves Maker still needs from the current (Maker-to-move) claim under this policy.
