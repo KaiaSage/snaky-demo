@@ -3,7 +3,8 @@
 (function (root) {
   'use strict';
 
-  const SYM = '0123456789ABCDEFG';
+  // The paper's coordinate alphabet; an extended certificate can supply a longer one (same first 17).
+  const SYM = globalThis.SNAKY_SYMBOLS || '0123456789ABCDEFG';
   const SNAKE = [[0, 0], [1, 0], [2, 0], [3, 0], [3, 1], [4, 1]];
 
   // Cells are packed into integers so they can live in Sets.

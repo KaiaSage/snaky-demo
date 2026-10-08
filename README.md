@@ -20,6 +20,14 @@ Open `index.html` in a browser. It starts in Blind mode. There is no build step 
 Below the board: *the squeeze* (Table 1 of the paper, the 32 children of card 727 intersecting down to the pivot)
 and a browser for all 728 cards.
 
+## Snaky in 20
+
+`twenty/` (served at `/twenty/`) is the same app playing an improved certificate, `js/certificate20.js`: the paper's
+722 lines plus 30 new cards, final card 757 with height 20. Black always wins within 20 moves, and within 18 after a
+diagonal or knight's-move first reply. The cards come from the search in `research/snaky20` on the
+`claude/research-snaky-20` branch and pass the paper's own verifier; they are a draft, not yet reviewed.
+`twenty/index.html` is generated from `index.html` by `node tools/make-twenty.mjs`.
+
 ## How it works
 
 - `js/certificate.js` is Appendix D verbatim (SHA-256 `3fa12d36…3d04`, matching the paper's verifier).
