@@ -4,6 +4,9 @@
   const S = window.Snaky;
   const cert = S.load(window.SNAKY_CERTIFICATE);
   const FINAL = cert.cards[cert.cards.length - 1];
+  const TARGET = FINAL.root.h;                 // 21 for the paper's certificate, 20 for the improved one
+  const OFFSET = 9 - FINAL.root.p[0];          // places the final card's pivot on tengen (K10)
+  const sub = (n) => String(n).replace(/\d/g, (d) => '₀₁₂₃₄₅₆₇₈₉'[d]);
 
   // ---------------------------------------------------------------- geometry
   const N = 19, U = 40, MARGIN = 46;
@@ -23,8 +26,8 @@
   }
   const clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
   const store = {
-    get(k, d) { try { const v = localStorage.getItem('snaky21.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('snaky21.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    get(k, d) { try { const v = localStorage.getItem('snaky' + TARGET + '.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('snaky' + TARGET + '.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
   };
 
   // ---------------------------------------------------------------- state
@@ -186,7 +189,7 @@
   // ---------------------------------------------------------------- views
   function viewGame() {
     if (st.review != null) {
-      const g = new S.Game(cert, { policy: st.policy });
+      const g = new S.Game(cert, { policy: st.policy, offset: OFFSET });
       g.restore(st.snaps[st.review]);
       return g;
     }
@@ -428,7 +431,7 @@
     $('mode-blind').setAttribute('aria-selected', st.mode === 'blind');
     $('mode-note').textContent = st.mode === 'glass'
       ? 'You can see Black’s cards, the envelope it needs clear, and how much every reply costs it.'
-      : 'No help. Hold out until Black’s 21st stone to win.' + (st.best ? ` Your best: ${st.best}.` : '');
+      : `No help. Hold out until Black’s ${TARGET}th stone to win.` + (st.best ? ` Your best: ${st.best}.` : '');
     $('glass').hidden = !glass;
     $('legend').style.visibility = glass ? 'visible' : 'hidden';
     $('btn-hint').hidden = !glass || st.review != null;
@@ -440,15 +443,15 @@
     $('moves').textContent = g.makerMoves;
     // forced total for the pips
     let forced = g.won ? g.won.moves : (!st.busy && !g.cur.node.base ? analysis(g).forced : null);
-    if (forced == null) forced = st.lastForced || 21;
+    if (forced == null) forced = st.lastForced || TARGET;
     st.lastForced = forced;
     const fb = $('forced-box');
     fb.hidden = !glass;
     $('forced').textContent = g.won ? `won on ${g.won.moves}` : `move ${forced}`;
-    fb.classList.toggle('lost', forced < 21);
+    fb.classList.toggle('lost', forced < TARGET);
     const pips = $('pips');
     clear(pips);
-    for (let i = 1; i <= 21; i++) {
+    for (let i = 1; i <= TARGET; i++) {
       const p = document.createElement('i');
       p.className = 'pip' + (i <= g.makerMoves ? ' done' : glass ? (i <= forced ? ' todo' : ' lost') : '');
       pips.appendChild(p);
@@ -456,15 +459,15 @@
     const status = $('status');
     if (g.won) {
       const m = g.won.moves;
-      status.innerHTML = m === 21 ? 'Black needed all 21 moves. That is a perfect defense.' : `Snaky on Black’s move ${m}. <b>${21 - m} short</b> of the full 21.`;
+      status.innerHTML = m === TARGET ? `Black needed all ${TARGET} moves. That is a perfect defense.` : `Snaky on Black’s move ${m}. <b>${TARGET - m} short</b> of the full ${TARGET}.`;
     } else if (st.review != null) {
       status.textContent = 'Reviewing. Hot cells were the replies that slowed Black down most.';
     } else if (st.busy) {
       status.textContent = 'Black is playing…';
     } else if (glass) {
       const a = analysis(g), np = a.perfect.length;
-      status.innerHTML = forced === 21 ? (a.everywhere ? 'Your move. Every reply keeps the 21 line here.' : `Your move. You are still on the 21 line; ${np} cell${np === 1 ? '' : 's'} keep${np === 1 ? 's' : ''} it.`)
-        : `Your move. Perfect play from here makes Black finish on move ${forced}; <b>${21 - forced} lost</b>.`;
+      status.innerHTML = forced === TARGET ? (a.everywhere ? `Your move. Every reply keeps the ${TARGET} line here.` : `Your move. You are still on the ${TARGET} line; ${np} cell${np === 1 ? '' : 's'} keep${np === 1 ? 's' : ''} it.`)
+        : `Your move. Perfect play from here makes Black finish on move ${forced}; <b>${TARGET - forced} lost</b>.`;
       if (a.wins.length) status.innerHTML += ` Last turn Black could have won at ${a.wins.map(goName).join(' or ')} (green ring) and played elsewhere; its plan never plays there.`;
     } else {
       status.textContent = 'Your move. Click any empty point.';
@@ -510,7 +513,7 @@
       const li = document.createElement('li');
       let note = '';
       if (h.who === 'maker') {
-        note = h.replacement ? 'replacement move' : n === 1 ? 'tengen, card 727' : (h.descents.length ? `free step ${h.descents.join(' → ')}` : '');
+        note = h.replacement ? 'replacement move' : n === 1 ? `tengen, card ${FINAL.id}` : (h.descents.length ? `free step ${h.descents.join(' → ')}` : '');
         if (g.won && n === g.history.length) note = 'Snaky!';
       } else {
         const e = st.log[bi++];
@@ -543,11 +546,11 @@
     if (fig.hidden) return;
     const svgT = $('tempo-svg');
     clear(svgT);
-    const vals = [21, ...st.log.map((e) => e.after)];
+    const vals = [TARGET, ...st.log.map((e) => e.after)];
     const lo = Math.max(1, Math.min(...vals) - 1);
     const X = (i) => TG.l + (i / Math.max(n, 1)) * (TG.w - TG.l - TG.r);
-    const Y = (v) => TG.t + ((21 - v) / Math.max(21 - lo, 1)) * (TG.h - TG.t - TG.b);
-    const ticks = [...new Set([21, vals[vals.length - 1], lo + 1])].filter((v) => v >= lo && v <= 21);
+    const Y = (v) => TG.t + ((TARGET - v) / Math.max(TARGET - lo, 1)) * (TG.h - TG.t - TG.b);
+    const ticks = [...new Set([TARGET, vals[vals.length - 1], lo + 1])].filter((v) => v >= lo && v <= TARGET);
     for (const v of ticks) {
       el('line', { x1: TG.l, x2: TG.w - TG.r, y1: Y(v), y2: Y(v), class: 't-grid' }, svgT);
       el('text', { x: TG.l - 6, y: Y(v) + 4, 'text-anchor': 'end' }, svgT).textContent = v;
@@ -573,9 +576,9 @@
     const hoverLine = el('line', { y1: TG.t, y2: TG.h - TG.b, class: 't-hover', visibility: 'hidden' }, svgT);
     const cap = $('tempo-cap');
     const idle = () => {
-      const lost = 21 - vals[vals.length - 1];
+      const lost = TARGET - vals[vals.length - 1];
       cap.textContent = lost ? `Each step down is a reply that let Black finish sooner: ${lost} move${lost > 1 ? 's' : ''} lost in total. Click the graph to review a reply.`
-        : 'Every reply so far held the 21 line. Click the graph to review a reply.';
+        : `Every reply so far held the ${TARGET} line. Click the graph to review a reply.`;
     };
     idle();
     const pick = (ev) => {
@@ -596,7 +599,7 @@
   const sgfCoord = (k) => String.fromCharCode(97 + S.kx(k)) + String.fromCharCode(97 + N - 1 - S.ky(k));
   function toSGF() {
     const g = st.game;
-    let s = '(;GM[1]FF[4]CA[UTF-8]SZ[19]AP[Snaky in 21]PB[Maker (card 727)]PW[Breaker]';
+    let s = '(;GM[1]FF[4]CA[UTF-8]SZ[19]AP[Snaky in ${TARGET}]PB[Maker (card ${FINAL.id})]PW[Breaker]';
     if (g.won) s += `RE[B+]C[Snaky on Black move ${g.won.moves}]`;
     s += '\n';
     for (const h of g.history) s += `;${h.who === 'maker' ? 'B' : 'W'}[${sgfCoord(h.cell)}]`;
@@ -613,7 +616,7 @@
     const whites = moves.filter((mv) => mv.who === 'W');
     if (!whites.length) return 'No White moves found. Expected entries like ;W[jk].';
     stopAuto();
-    st.game = new S.Game(cert, { policy: st.policy });
+    st.game = new S.Game(cert, { policy: st.policy, offset: OFFSET });
     st.snaps = []; st.log = []; st.review = null; st.hintCell = null; st.autoUsed = true;
     $('banner').hidden = true;
     st.game.makerMove();
@@ -666,7 +669,7 @@
   // ---------------------------------------------------------------- game flow
   function newGame() {
     stopAuto();
-    st.game = new S.Game(cert, { policy: st.policy });
+    st.game = new S.Game(cert, { policy: st.policy, offset: OFFSET });
     st.snaps = []; st.log = []; st.review = null; st.hintCell = null; st.autoUsed = false;
     st.sgfDirty = false; $('sgf-msg').textContent = '';
     $('banner').hidden = true;
@@ -727,10 +730,10 @@
     if (st.mode === 'blind' && !watched && m > st.best) { st.best = m; store.set('best', m); }
     stopAuto();
     const b = $('banner');
-    const perfect = m === 21;
-    b.innerHTML = `<h3>${perfect ? 'All 21.' : 'Snaky.'}</h3>` +
+    const perfect = m === TARGET;
+    b.innerHTML = `<h3>${perfect ? `All ${TARGET}.` : 'Snaky.'}</h3>` +
       `<p>${perfect ? (watched ? 'That is the longest any defense can last against this proof.' : 'You found a perfect defense. Black needed every move the proof allows.')
-        : `Black completed the shape on move ${m}. A perfect defense lasts to 21.`}</p>` +
+        : `Black completed the shape on move ${m}. A perfect defense lasts to ${TARGET}.`}</p>` +
       `<div class="row"><button class="btn" id="bn-review">Review the game</button><button class="btn btn-primary" id="bn-new">Play again</button><button class="btn" id="bn-close">Close</button></div>`;
     // Keep the banner off the snake.
     const sy = st.game.won.snake.reduce((t, k) => t + S.ky(k), 0) / 6;
@@ -875,25 +878,33 @@
   (function facts() {
     let tight = 0;
     for (const c of cert.cards) if (c.root.V === c.root.h) tight++;
-    $('fact').textContent = `Checked in your browser just now: the rebuilt card 727 has A = ∅, |T| = ${FINAL.root.T.size}, h = ${FINAL.root.h}. ` +
-      `For ${tight} of ${cert.cards.length} cards, a perfect White can force the full height h, so 21 is exactly how long this strategy can be made to last. Random play lasts about 7.`;
+    $('fact').textContent = `Checked in your browser just now: the rebuilt card ${FINAL.id} has A = ∅, |T| = ${FINAL.root.T.size}, h = ${FINAL.root.h}. ` +
+      `For ${tight} of ${cert.cards.length} cards, a perfect White can force the full height h, so ${TARGET} is exactly how long this strategy can be made to last. Random play lasts about 7.`;
   })();
 
   // ---------------------------------------------------------------- squeeze explorer
   const sq = { k: 0, timer: null };
+  // The final card's envelope in its own frame: a 17x17 box for both certificates.
+  const SQ = (() => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const k of FINAL.root.T) { x0 = Math.min(x0, S.kx(k)); x1 = Math.max(x1, S.kx(k)); y0 = Math.min(y0, S.ky(k)); y1 = Math.max(y1, S.ky(k)); }
+    return { x0, y0, n: Math.max(x1 - x0, y1 - y0) + 1, kids: FINAL.root.kids.length };
+  })();
+  $('sq-of').textContent = ` / ${SQ.kids}`;
+  $('sq-slider').max = SQ.kids;
   function drawSqueeze() {
     const cv = $('sq-canvas'), ctx = cv.getContext('2d');
-    const P = cv.width, c = P / 17;
+    const P = cv.width, c = P / SQ.n;
     const root = FINAL.root;
     ctx.fillStyle = '#e0b673'; ctx.fillRect(0, 0, P, P);
     ctx.strokeStyle = 'rgba(58,41,20,.35)'; ctx.lineWidth = 1;
-    for (let i = 0; i < 17; i++) {
+    for (let i = 0; i < SQ.n; i++) {
       ctx.beginPath(); ctx.moveTo(c / 2, c / 2 + i * c); ctx.lineTo(P - c / 2, c / 2 + i * c); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(c / 2 + i * c, c / 2); ctx.lineTo(c / 2 + i * c, P - c / 2); ctx.stroke();
     }
     let common = new Set(root.T);
     for (let i = 0; i < sq.k; i++) for (const k of common) if (!root.kids[i].T.has(k)) common.delete(k);
-    const X = (k) => S.kx(k) * c, Y = (k) => (16 - S.ky(k)) * c;
+    const X = (k) => (S.kx(k) - SQ.x0) * c, Y = (k) => (SQ.y0 + SQ.n - 1 - S.ky(k)) * c;
     ctx.fillStyle = 'rgba(45,74,128,.22)';
     for (const k of root.T) ctx.fillRect(X(k) + c * .3, Y(k) + c * .3, c * .4, c * .4);
     ctx.fillStyle = 'rgba(45,74,128,.9)';
@@ -903,23 +914,23 @@
       ctx.strokeStyle = '#c3412a'; ctx.lineWidth = 1.6;
       for (const k of kid.T) ctx.strokeRect(X(k) + c * .08, Y(k) + c * .08, c * .84, c * .84);
     }
-    const ck = S.key(8, 8);
+    const ck = S.key(root.p[0], root.p[1]);
     ctx.beginPath(); ctx.arc(X(ck) + c / 2, Y(ck) + c / 2, c * .42, 0, 7);
     const gr = ctx.createRadialGradient(X(ck) + c * .4, Y(ck) + c * .35, 1, X(ck) + c / 2, Y(ck) + c / 2, c * .45);
     gr.addColorStop(0, '#6b6b6b'); gr.addColorStop(1, '#050505'); ctx.fillStyle = gr; ctx.fill();
     $('sq-k').textContent = sq.k;
     $('sq-left').textContent = common.size - 1;
-    $('sq-card').textContent = sq.k ? `+ ${root.kids[sq.k - 1].label} (h ${root.kids[sq.k - 1].node.h})` : 'all of T₇₂₇, 251 cells';
+    $('sq-card').textContent = sq.k ? `+ ${root.kids[sq.k - 1].label} (h ${root.kids[sq.k - 1].node.h})` : `all of T${sub(FINAL.id)}, ${root.T.size} cells`;
     $('sq-slider').value = sq.k;
   }
   $('sq-slider').oninput = (e) => { sq.k = +e.target.value; drawSqueeze(); };
   $('sq-play').onclick = () => {
     if (sq.timer) { clearInterval(sq.timer); sq.timer = null; $('sq-play').textContent = 'Play'; return; }
-    if (sq.k >= 32) sq.k = 0;
+    if (sq.k >= SQ.kids) sq.k = 0;
     $('sq-play').textContent = 'Pause';
     sq.timer = setInterval(() => {
       sq.k++; drawSqueeze();
-      if (sq.k >= 32) { clearInterval(sq.timer); sq.timer = null; $('sq-play').textContent = 'Play'; }
+      if (sq.k >= SQ.kids) { clearInterval(sq.timer); sq.timer = null; $('sq-play').textContent = 'Play'; }
     }, 380);
   };
 
@@ -974,12 +985,13 @@
     $('cb-back').disabled = !cb.stack.length;
   }
   function openCard(j, push = true) {
-    j = Math.max(0, Math.min(727, j | 0));
+    j = Math.max(0, Math.min(cert.cards.length - 1, j | 0));
     openNode(cert.cards[j].root, `Card ${j}`, push);
   }
   $('cb-go').onclick = () => openCard(+$('cb-input').value);
   $('cb-input').onkeydown = (e) => { if (e.key === 'Enter') openCard(+e.target.value); };
-  $('cb-rand').onclick = () => openCard(6 + Math.floor(Math.random() * 722));
+  $('cb-input').max = cert.cards.length - 1;
+  $('cb-rand').onclick = () => openCard(6 + Math.floor(Math.random() * (cert.cards.length - 6)));
   $('cb-back').onclick = () => { if (cb.stack.length) { cb.cur = cb.stack.pop(); drawCard(); } };
 
   // ---------------------------------------------------------------- boot
