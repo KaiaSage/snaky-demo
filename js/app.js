@@ -258,13 +258,37 @@
       ` Black switches to <b>${S.kidLabel(kid)}</b> and next threatens <b>${goName(pv)}</b>.<br>` +
       (delta === 0 ? `Keeps the line: perfect play still lasts to move ${finish}.` : `Black then wins by move ${finish} at the latest (−${delta}).`);
     tip.hidden = false;
+    placeTip(tip, g, k, [cells.pivot, ...cells.A]);
+  }
+
+  // Put the tooltip where it hides the fewest stones and highlighted points.
+  function placeTip(tip, g, k, marks) {
     const rect = svg.getBoundingClientRect();
-    const sx = rect.width / W;
-    let left = px(S.kx(k)) * sx + 18, top = py(S.ky(k)) * sx + 18;
-    if (left > rect.width - 270) left = px(S.kx(k)) * sx - 270;
-    if (top > rect.height - 110) top = py(S.ky(k)) * sx - 110;
-    tip.style.left = Math.max(0, left) + 'px';
-    tip.style.top = Math.max(0, top) + 'px';
+    const sc = rect.width / W;
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    const cx = px(S.kx(k)) * sc, cy = py(S.ky(k)) * sc;
+    const pts = [];
+    for (const c of g.maker) pts.push([c, 3]);
+    for (const c of g.breaker) pts.push([c, 3]);
+    for (const c of marks) pts.push([c, 2]);
+    pts.push([k, 50]);
+    const r = 20 * sc; // stone radius on screen
+    let best = null;
+    for (const d of [1, 2.5, 4.5]) {
+      const gap = d * U * sc;
+      for (const [ox, oy] of [[gap, gap * .5], [gap, -th - gap * .5], [-tw - gap, gap * .5], [-tw - gap, -th - gap * .5], [-tw / 2, gap], [-tw / 2, -th - gap]]) {
+        const left = Math.min(Math.max(0, cx + ox), rect.width - tw);
+        const top = Math.min(Math.max(0, cy + oy), rect.height - th);
+        let cost = d * 0.6;
+        for (const [c, w] of pts) {
+          const x = px(S.kx(c)) * sc, y = py(S.ky(c)) * sc;
+          if (x > left - r && x < left + tw + r && y > top - r && y < top + th + r) cost += w;
+        }
+        if (!best || cost < best.cost) best = { cost, left, top };
+      }
+    }
+    tip.style.left = best.left + 'px';
+    tip.style.top = best.top + 'px';
   }
 
   // ---------------------------------------------------------------- Maker's hand (cards)
