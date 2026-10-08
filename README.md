@@ -4,7 +4,7 @@ Play White against the Maker strategy from
 [“Snaky in 21 Maker moves”](https://github.com/openai/math/blob/main/preprints/Snaky-in-21-Maker-moves-September-25-2026/article.pdf)
 on a 19×19 Go board. Black always completes the Snaky hexomino; the game is how long you can make it take.
 
-Open `index.html` in a browser. There is no build step and no server logic.
+Open `index.html` in a browser. It starts in Blind mode. There is no build step and no server logic.
 
 ## Modes
 
@@ -12,6 +12,8 @@ Open `index.html` in a browser. There is no build step and no server logic.
   Black's hand of child cards (hover a point to see which cards it kills and which one Black switches to),
   and the proof path from card 727 down to a base card.
 - **Blind**: no help. You win if Black needs all 21 moves. After the game, review it with the glass box.
+- **Review**: after a game (or any time in glass box), click a move in the record or press ← →; *Resume from here* rewinds and lets you try another reply.
+- **SGF**: copy the game, or paste one and load it (White's moves are replayed; Black answers with this strategy).
 - **Watch perfect defense**: White plays a reply that keeps the maximum delay every time; it always lasts exactly 21.
 
 Below the board: *the squeeze* (Table 1 of the paper, the 32 children of card 727 intersecting down to the pivot)

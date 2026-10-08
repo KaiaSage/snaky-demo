@@ -29,7 +29,7 @@
 
   // ---------------------------------------------------------------- state
   const st = {
-    mode: store.get('mode', 'glass'),
+    mode: 'blind',
     policy: 'smart',
     game: null,
     snaps: [],   // game snapshots taken at every Breaker-to-move position
@@ -81,8 +81,6 @@
     const nr = el('text', { x: W - MARGIN + 26, y: py(i) + 4.5, 'text-anchor': 'middle', class: 'coord' }, gGrid); nr.textContent = i + 1;
   }
   for (const x of [3, 9, 15]) for (const y of [3, 9, 15]) el('circle', { cx: px(x), cy: py(y), r: 4, fill: '#3a2914' }, gGrid);
-  // The paper's 17x17 board, outlined faintly.
-  el('rect', { x: px(1) - U / 2, y: py(17) - U / 2, width: U * 17, height: U * 17, fill: 'none', stroke: 'rgba(45,74,128,.35)', 'stroke-width': 1.5, 'stroke-dasharray': '5 6', rx: 6 }, gGrid);
   const gEnv = el('g', {}, svg);
   const gHeat = el('g', {}, svg);
   const gPreview = el('g', {}, svg);
@@ -246,6 +244,9 @@
       const x = px(S.kx(c)), y = py(S.ky(c));
       el('rect', { x: x - 19, y: y - 19, width: 38, height: 38, rx: 4, fill: 'rgba(45,74,128,.13)', stroke: 'rgba(45,74,128,.45)', 'stroke-width': 1 }, gPreview);
     }
+    for (const c of cells.A) {
+      el('circle', { cx: px(S.kx(c)), cy: py(S.ky(c)), r: 21.5, fill: 'none', stroke: '#f2c14e', 'stroke-width': 3 }, gPreview);
+    }
     const pv = cells.pivot;
     el('circle', { cx: px(S.kx(pv)), cy: py(S.ky(pv)), r: 15, fill: 'none', stroke: '#c3412a', 'stroke-width': 3, class: 'pivot-pulse' }, gPreview);
     updateCardStates(k, info);
@@ -294,9 +295,9 @@
       card.appendChild(cv);
       const cap = document.createElement('div');
       cap.className = 'cn';
-      cap.innerHTML = `<b title="${S.kidLabel(kid)}">${S.kidLabel(kid)}</b><span>h${kid.node.h}</span>`;
+      cap.innerHTML = `<b>${S.kidLabel(kid)}</b><span>h${kid.node.h}</span>`;
       card.appendChild(cap);
-      card.title = `${S.kidLabel(kid)}: wins within ${v} more Black moves`;
+      card.title = describeStep(S.kidLabel(kid), kid.node.h);
       box.appendChild(card);
       cardEls.push(card);
       const placed = { node: kid.node, F: S.compose(g.cur.F, kid.G) };
@@ -312,10 +313,13 @@
     const P = cv.width, c = P / span;
     ctx.fillStyle = '#e0b673'; ctx.fillRect(0, 0, P, P);
     const X = (x) => (x - ox) * c, Y = (y) => (oy + span - 1 - y) * c;
-    ctx.fillStyle = 'rgba(45,74,128,.75)';
-    for (const k of cells.T) ctx.fillRect(X(S.kx(k)) + c * .12, Y(S.ky(k)) + c * .12, c * .76, c * .76);
+    const req = new Set(cells.A);
+    ctx.fillStyle = 'rgba(45,74,128,.6)';
+    for (const k of cells.T) if (!req.has(k)) ctx.fillRect(X(S.kx(k)) + c * .2, Y(S.ky(k)) + c * .2, c * .6, c * .6);
     const dot = (k, fill, r) => { ctx.beginPath(); ctx.arc(X(S.kx(k)) + c / 2, Y(S.ky(k)) + c / 2, c * r, 0, 7); ctx.fillStyle = fill; ctx.fill(); };
-    for (const k of g.maker) if (inView(k)) dot(k, '#111', .42);
+    // Black stones this card requires get a gold halo; other Black stones are faded.
+    for (const k of g.maker) if (inView(k) && !req.has(k)) dot(k, 'rgba(17,17,17,.4)', .3);
+    for (const k of req) if (inView(k)) { dot(k, '#f2c14e', .62); dot(k, '#111', .44); }
     for (const k of g.breaker) if (inView(k)) { dot(k, '#7d7a72', .44); dot(k, '#f4f2ea', .36); }
     ctx.beginPath(); ctx.arc(X(S.kx(cells.pivot)) + c / 2, Y(S.ky(cells.pivot)) + c / 2, c * .4, 0, 7);
     ctx.lineWidth = Math.max(1.5, c * .18); ctx.strokeStyle = '#c3412a'; ctx.stroke();
@@ -393,6 +397,17 @@
     if (glass) renderCards();
   }
 
+  const SYMS = ['as printed', 'swap x and y', 'flip x', 'flip x, then swap', 'flip y', 'flip y, then swap', 'flip x and y (half turn)', 'flip x and y, then swap'];
+  function describeStep(label, h) {
+    const tail = `h${h}: Black wins within ${h} more moves if White stays out of this card's envelope.`;
+    let m = /^(\d+)\((\w)(\w)/.exec(label);
+    if (m) return `Inline step inside card ${m[1]}, pivot (${S.SYM.indexOf(m[2])},${S.SYM.indexOf(m[3])}) in that card's coordinates.\n${tail}`;
+    m = /^(\d+):(\d)(\w)(\w)$/.exec(label);
+    if (m) return `Card ${m[1]}, symmetry ${m[2]} (${SYMS[+m[2]]}), shifted by (${S.SYM.indexOf(m[3])},${S.SYM.indexOf(m[4])}).\n${tail}`;
+    if (/^\d+$/.test(label)) return `Card ${label}, placed as printed.\n${tail}`;
+    return tail;
+  }
+
   function renderPath(g) {
     const ol = $('path');
     clear(ol);
@@ -400,7 +415,7 @@
       const li = document.createElement('li');
       if (p.free) li.className = 'free';
       li.innerHTML = `${p.via || p.label}<span class="h">h${p.node.h}</span>`;
-      li.title = p.free ? 'Pivot already owned: Black descends for free' : '';
+      li.title = describeStep(p.via || p.label, p.node.h) + (p.free ? '\nPivot already owned, so Black moved here without spending a stone.' : '');
       ol.appendChild(li);
     }
   }
@@ -411,6 +426,8 @@
     const g = st.game;
     let n = 0, bi = 0;
     const done = !!g.won;
+    const reviewable = canReview();
+    $('kifu-hint').textContent = !st.log.length ? '' : reviewable ? 'Click a move or press ← → to review' : 'Review opens when the game ends';
     for (const h of g.history) {
       n++;
       const li = document.createElement('li');
@@ -426,10 +443,65 @@
         }
       }
       li.innerHTML = `<span>${n}.</span><span class="st ${h.who === 'maker' ? 'b' : 'w'}"></span><span>${goName(h.cell)}</span><span class="note">${note}</span>`;
-      if (h.who === 'breaker' && done) { li.style.cursor = 'pointer'; li.dataset.review = bi - 1; }
+      const ri = Math.max(0, Math.min(st.log.length - 1, h.who === 'breaker' ? bi - 1 : bi - 1));
+      if (reviewable && st.log.length) { li.style.cursor = 'pointer'; li.dataset.review = ri; }
+      if (st.review != null && h.who === 'breaker' && bi - 1 === st.review) li.classList.add('current');
       ol.appendChild(li);
     }
-    ol.scrollTop = ol.scrollHeight;
+    const cur = ol.querySelector('.current');
+    if (cur) cur.scrollIntoView({ block: 'nearest' }); else if (st.review == null) ol.scrollTop = ol.scrollHeight;
+    const ta = $('sgf-text');
+    if (!st.sgfDirty && document.activeElement !== ta) ta.value = toSGF();
+  }
+
+  const canReview = () => !!st.game.won || st.mode === 'glass';
+
+  // ---------------------------------------------------------------- SGF
+  const sgfCoord = (k) => String.fromCharCode(97 + S.kx(k)) + String.fromCharCode(97 + N - 1 - S.ky(k));
+  function toSGF() {
+    const g = st.game;
+    let s = '(;GM[1]FF[4]CA[UTF-8]SZ[19]AP[Snaky in 21]PB[Maker (card 727)]PW[Breaker]';
+    if (g.won) s += `RE[B+]C[Snaky on Black move ${g.won.moves}]`;
+    s += '\n';
+    for (const h of g.history) s += `;${h.who === 'maker' ? 'B' : 'W'}[${sgfCoord(h.cell)}]`;
+    return s + ')';
+  }
+  function loadSGF(text) {
+    const moves = [];
+    const re = /(?:^|[;\s\]])\s*([BW])\s*\[([a-s]{2})\]/g;
+    let m;
+    while ((m = re.exec(text))) {
+      const x = m[2].charCodeAt(0) - 97, y = N - 1 - (m[2].charCodeAt(1) - 97);
+      moves.push({ who: m[1], k: S.key(x, y) });
+    }
+    const whites = moves.filter((mv) => mv.who === 'W');
+    if (!whites.length) return 'No White moves found. Expected entries like ;W[jk].';
+    stopAuto();
+    st.game = new S.Game(cert, { policy: st.policy });
+    st.snaps = []; st.log = []; st.review = null; st.hintCell = null; st.autoUsed = true;
+    $('banner').hidden = true;
+    st.game.makerMove();
+    let used = 0;
+    for (const w of whites) {
+      if (st.game.won) break;
+      if (!st.game.isFree(w.k)) return finishLoad(`Stopped at White ${goName(w.k)}: that point is already taken.`, used);
+      recordBreaker(w.k);
+      st.game.makerMove();
+      used++;
+    }
+    const blacks = moves.filter((mv) => mv.who === 'B').map((mv) => mv.k);
+    const played = st.game.history.filter((h) => h.who === 'maker').map((h) => h.cell);
+    const differ = blacks.length && blacks.some((k, i) => i < played.length && k !== played[i]);
+    let msg = `Loaded ${used} White move${used === 1 ? '' : 's'}.`;
+    if (used < whites.length) msg += ` The game ended before the last ${whites.length - used}.`;
+    if (differ) msg += ' Black answered differently from the file, so its moves were replayed by this strategy.';
+    return finishLoad(msg);
+  }
+  function finishLoad(msg) {
+    if (st.game.won) st.snakeFresh = true;
+    st.sgfDirty = false;
+    render();
+    return msg;
   }
 
   function renderReview() {
@@ -444,7 +516,8 @@
     const g = viewGame();
     const a = analysis(g);
     $('rv-text').innerHTML = `Reply ${st.review + 1} of ${st.log.length}: White ${goName(e.cell)} blocked ${e.blocked} of ${e.of} cards. ` +
-      (loss ? `It cost ${loss} move${loss > 1 ? 's' : ''}; perfect play was any of ${a.perfect.length} hot cells.` : 'It kept the line.');
+      (loss ? `It cost ${loss} move${loss > 1 ? 's' : ''}; perfect play was any of ${a.perfect.length} hot cells.` : 'It kept the line.') +
+      ' Resume from here to try another reply.';
   }
 
   function render() {
@@ -458,6 +531,7 @@
     stopAuto();
     st.game = new S.Game(cert, { policy: st.policy });
     st.snaps = []; st.log = []; st.review = null; st.hintCell = null; st.autoUsed = false;
+    st.sgfDirty = false; $('sgf-msg').textContent = '';
     $('banner').hidden = true;
     makerTurn(120);
   }
@@ -480,14 +554,30 @@
   function breakerPlay(k) {
     const g = st.game;
     if (st.busy || g.won || st.review != null || !g.isFree(k)) return;
+    recordBreaker(k);
+    st.hover = null; st.hintCell = null;
+    st.justPlaced = k;
+    makerTurn();
+  }
+  function recordBreaker(k) {
+    const g = st.game;
     const a = analysis(g);
     const info = replyInfo(g, k);
     st.snaps.push(g.snapshot());
     g.breakerMove(k);
     st.log.push({ cell: k, before: a.forced, after: g.makerMoves + info.value, blocked: info.blocked, of: info.total });
-    st.hover = null; st.hintCell = null;
-    st.justPlaced = k;
-    makerTurn();
+  }
+
+  // Rewind to the position before reply i and keep playing from there.
+  function resumeFrom(i) {
+    stopAuto();
+    st.game.restore(st.snaps[i]);
+    st.snaps = st.snaps.slice(0, i);
+    st.log = st.log.slice(0, i);
+    st.review = null; st.hintCell = null;
+    st.autoUsed = true; // a resumed game doesn't count toward the blind record
+    $('banner').hidden = true;
+    render();
   }
 
   function onWin() {
@@ -582,7 +672,7 @@
   };
   function setMode(m) {
     if (st.mode === m) return;
-    st.mode = m; store.set('mode', m);
+    st.mode = m;
     stopAuto();
     newGame();
   }
@@ -595,14 +685,29 @@
   $('rv-prev').onclick = () => { if (st.review > 0) { st.review--; render(); } };
   $('rv-next').onclick = () => { if (st.review < st.log.length - 1) { st.review++; render(); } };
   $('rv-exit').onclick = () => { st.review = null; render(); };
+  $('rv-resume').onclick = () => { if (st.review != null) resumeFrom(st.review); };
+  $('sgf-text').addEventListener('input', () => { st.sgfDirty = true; });
+  $('sgf-copy').onclick = () => {
+    const ta = $('sgf-text');
+    ta.value = toSGF(); st.sgfDirty = false;
+    const done = () => { $('sgf-msg').textContent = 'Copied.'; };
+    const fallback = () => { ta.focus(); ta.select(); $('sgf-msg').textContent = 'Selected. Press Ctrl+C or ⌘C to copy.'; };
+    try { navigator.clipboard.writeText(ta.value).then(done, fallback); } catch (e) { fallback(); }
+  };
+  $('sgf-load').onclick = () => { $('sgf-msg').textContent = loadSGF($('sgf-text').value); };
   $('kifu').addEventListener('click', (e) => {
     const li = e.target.closest('li');
     if (li && li.dataset.review != null) startReview(+li.dataset.review);
   });
   document.addEventListener('keydown', (e) => {
-    if (st.review == null) return;
+    if (e.target.closest && e.target.closest('input, textarea')) return;
+    if (st.review == null) {
+      if (e.key === 'ArrowLeft' && canReview() && st.log.length && !st.busy) { e.preventDefault(); startReview(st.log.length - 1); }
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
     if (e.key === 'ArrowLeft') $('rv-prev').click();
-    if (e.key === 'ArrowRight') $('rv-next').click();
+    if (e.key === 'ArrowRight') { if (st.review === st.log.length - 1) $('rv-exit').click(); else $('rv-next').click(); }
     if (e.key === 'Escape') $('rv-exit').click();
   });
 

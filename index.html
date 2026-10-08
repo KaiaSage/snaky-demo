@@ -40,8 +40,36 @@
           <span class="lg"><i class="sw sw-heat1"></i>delays Maker</span>
           <span class="lg"><i class="sw sw-heat2"></i>keeps the 21 line</span>
           <span class="lg"><i class="sw sw-pivot"></i>Maker's next threat</span>
+          <span class="lg"><i class="sw sw-req"></i>stones the next card requires</span>
         </span>
       </div>
+      <section id="review" class="review" hidden>
+        <div class="review-row">
+          <button id="rv-prev" class="btn" aria-label="Previous reply">◀</button>
+          <input type="range" id="rv-slider" min="0" max="0" value="0" aria-label="Reply to review">
+          <button id="rv-next" class="btn" aria-label="Next reply">▶</button>
+          <button id="rv-resume" class="btn">Resume from here</button>
+          <button id="rv-exit" class="btn">Exit review</button>
+        </div>
+        <p id="rv-text" class="rv-text"></p>
+      </section>
+      <section class="kifu-sec">
+        <div class="kifu-head">
+          <h2>Game record</h2>
+          <span id="kifu-hint" class="kifu-hint"></span>
+        </div>
+        <ol id="kifu" class="kifu"></ol>
+        <details class="sgf" id="sgf-box">
+          <summary>SGF</summary>
+          <p class="sgf-note">Copy this game, or paste an SGF and load it. Only White's moves are read; Black replays its own.</p>
+          <textarea id="sgf-text" rows="4" spellcheck="false" aria-label="SGF text"></textarea>
+          <div class="sgf-row">
+            <button id="sgf-copy" class="btn">Copy SGF</button>
+            <button id="sgf-load" class="btn">Load pasted SGF</button>
+            <span id="sgf-msg" class="sgf-msg" aria-live="polite"></span>
+          </div>
+        </details>
+      </section>
     </section>
 
     <aside class="panel" aria-label="Game panel">
@@ -85,24 +113,10 @@
         <p class="hand-note" id="hand-note"></p>
         <div id="cards" class="cards"></div>
         <h2>Proof path</h2>
+        <p class="hand-note">Each step reads <span class="mono">card:sXY</span>: the card number, its symmetry s (bit 1 swaps x and y, bit 2 flips x, bit 4 flips y), and its offset XY in the paper's alphabet 0–9A–G. h is the most Black moves the card still needs. Hover a step for details.</p>
         <ol id="path" class="path"></ol>
       </section>
 
-      <section class="kifu-sec">
-        <h2>Game record</h2>
-        <ol id="kifu" class="kifu"></ol>
-      </section>
-
-      <section id="review" class="review" hidden>
-        <h2>Review</h2>
-        <div class="review-row">
-          <button id="rv-prev" class="btn" aria-label="Previous reply">◀</button>
-          <input type="range" id="rv-slider" min="0" max="0" value="0" aria-label="Reply to review">
-          <button id="rv-next" class="btn" aria-label="Next reply">▶</button>
-        </div>
-        <p id="rv-text" class="rv-text"></p>
-        <button id="rv-exit" class="btn">Back to final position</button>
-      </section>
     </aside>
   </main>
 
@@ -117,6 +131,10 @@
       <p>The final card, 727, needs nothing (A = ∅), fits in a 17×17 square (|T| = 251), and has height 21. Its pivot is
         the paper's (8,8), which on this board is tengen, the centre point K10. In glass-box mode, every hot cell on the
         board is a reply that kills the fastest cards in Black's hand.</p>
+      <p>Black is not searching for the quickest win. It only follows cards: after each reply it switches to the live
+        card with the lowest height, and a height is a worst-case bound. Against weak defence that is usually close to the
+        fastest win, but not always. If White plays only along the bottom edge, Black builds five in a row (K9–K13) and
+        finishes on move 7 instead of 6.</p>
       <p class="fact" id="fact"></p>
     </div>
   </section>
