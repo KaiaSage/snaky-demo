@@ -7,12 +7,17 @@ two SGF letters each (`w=kjjhij` is L10, K12, J10).
 | URL | What it returns |
 |---|---|
 | `/` | Rules and a start link |
-| `/play?w=` | A new game: board, move list, and a link for every legal reply |
+| `/play?w=&links=0` | A new game, short page; play by adding `&move=K11` (recommended for agents) |
+| `/play?w=` | A new game with a link for every legal reply |
 | `/play?w=…&move=K11` | Same as appending K11 to `w` |
 | `&glass=1` | Adds the strategy view: cost of your last reply, Black's cards, replies that keep the best finish |
 | `&links=0` | Drops the move links (for agents that can build URLs themselves) |
 
-Every page lists a link per empty point because many agent fetch tools only follow URLs they have already seen.
+Without `links=0`, every page lists a link per empty point, because many agent fetch tools only follow URLs they
+have already seen. Pages use short labelled lines (`STATUS:`, `SUMMARY:`, `POSITION URL:`, …) with each URL on its own
+line, because some fetch tools only quote short lines verbatim and paraphrase the rest. Error pages are 400s that link
+back to the last valid position. The glass view also flags wins Black's plan ignores: Black only plays its current
+card's next stone, so it can leave a finished shape one move away.
 Responses are plain text, cacheable (the same URL always gives the same page), and CORS-open.
 
 ## Deploy

@@ -989,6 +989,20 @@ globalThis.SNAKY_CERTIFICATE = `6 14 4:100 5:101
       return { index: pick, blocked };
     }
 
+    // Free points where one more Black stone would complete Snaky. The card policy never looks
+    // for these: it only plays its card's next stone, so it can leave a ready win on the board.
+    winningPoints() {
+      const out = [];
+      for (let x = 0; x < this.size; x++) for (let y = 0; y < this.size; y++) {
+        const k = key(x, y);
+        if (!this.isFree(k)) continue;
+        this.maker.add(k);
+        if (this.findSnake(k)) out.push(k);
+        this.maker.delete(k);
+      }
+      return out;
+    }
+
     findSnake(k) {
       const x0 = kx(k), y0 = ky(k);
       for (const cells of ORIENTS) {
@@ -1122,6 +1136,7 @@ globalThis.SNAKY_CERTIFICATE = `6 14 4:100 5:101
 //
 // Routes:  /            instructions and a link to start
 //          /play?w=...  board after White's moves; &glass=1 adds strategy info; &links=0 drops the link list
+//                       (errors are 400s that link back to the last valid position)
 //          /play?w=...&move=K11   same as appending K11 to w
 
 const S = globalThis.Snaky;
@@ -1139,18 +1154,37 @@ function fromGo(s) {
   return y >= 0 && y < 19 ? S.key(x, y) : null;
 }
 
-class BadRequest extends Error {}
+class BadRequest extends Error {
+  constructor(message, back) { super(message); this.back = back; }
+}
 
-// Replays White's moves. Throws BadRequest with a readable message on any illegal input.
+// Lines are kept short (and URLs get their own line) because some agent fetch tools only quote
+// short lines verbatim and paraphrase the rest.
+const WRAP = 100;
+function wrapList(label, items, sep = ', ') {
+  const lines = [];
+  let cur = label;
+  items.forEach((it, i) => {
+    const piece = (i ? sep : ' ') + it;
+    if (cur.length + piece.length > WRAP && cur.trim() !== label.trim()) { lines.push(cur + (i < items.length ? sep.trimEnd() : '')); cur = '  ' + it; }
+    else cur += piece;
+  });
+  lines.push(cur);
+  return lines;
+}
+
+// Replays White's moves. On illegal input, throws BadRequest carrying the longest valid prefix.
 function replay(w) {
-  if (!/^([a-s]{2})*$/.test(w)) throw new BadRequest(`"w" must be pairs of letters a–s (SGF coordinates), got "${w}".`);
   const g = new S.Game(cert);
   g.makerMove();
   const log = [];
   for (let i = 0; i < w.length; i += 2) {
-    const k = fromSgf(w.slice(i, i + 2));
-    if (g.won) throw new BadRequest(`The game ended before White's move ${i / 2 + 1} (${goName(k)}).`);
-    if (!g.isFree(k)) throw new BadRequest(`White's move ${i / 2 + 1} (${goName(k)}) is on an occupied point.`);
+    const pair = w.slice(i, i + 2);
+    const back = w.slice(0, i);
+    if (!/^[a-s]{2}$/.test(pair)) throw new BadRequest(`"w" must be pairs of letters a-s (SGF coordinates); "${pair}" is not.`, back);
+    const k = fromSgf(pair);
+    if (g.won) throw new BadRequest(`The game was already over before White's move ${i / 2 + 1} (${goName(k)}).`, back);
+    if (!g.isFree(k)) throw new BadRequest(`${goName(k)} is already taken (White's move ${i / 2 + 1}).`, back);
     const before = forced(g);
     g.breakerMove(k);
     g.makerMove();
@@ -1182,56 +1216,73 @@ function boardText(g) {
 }
 
 function glassText(g, log) {
-  const lines = ['STRATEGY VIEW (glass=1)'];
+  const out = ['STRATEGY VIEW (glass=1)'];
   const lost = log.reduce((t, e) => t + e.lost, 0);
-  if (log.length) {
-    const e = log[log.length - 1];
-    lines.push(`Your last reply ${goName(e.k)} ${e.lost ? `cost ${e.lost} move${e.lost > 1 ? 's' : ''}` : 'kept the line'}. Moves lost so far: ${lost}.`);
+  if (g.won) {
+    out.push(`LOST: ${lost} move${lost === 1 ? '' : 's'} in total.`);
+    return out;
   }
-  if (g.won) return lines.join('\n');
   const { map, base, total } = g.replyMap();
-  const node = g.cur.node;
   let best = base.value;
   for (const v of map.values()) best = Math.max(best, v.value);
-  lines.push(`Black just played ${goName(g.claimCells().pivot)} and holds ${total} card${total > 1 ? 's' : ''} (proof step ${g.cur.label}, height ${node.h}).`);
-  lines.push(`With perfect defense from here Black finishes on move ${g.makerMoves + best}.`);
-  const rows = [...map].filter(([, v]) => v.value > base.value).sort((a, b) => b[1].value - a[1].value || b[1].blocked - a[1].blocked);
-  if (best === base.value) {
-    lines.push('Every reply is equally good here: all of Black\'s cards are equally fast.');
-  } else {
-    const perfect = rows.filter(([, v]) => v.value === best).map(([k, v]) => `${goName(k)} (blocks ${v.blocked}/${total})`);
-    lines.push(`Replies that keep that finish: ${perfect.join(', ')}.`);
-    const other = rows.filter(([, v]) => v.value < best).slice(0, 12).map(([k, v]) => `${goName(k)}→${g.makerMoves + v.value}`);
-    if (other.length) lines.push(`Other replies that slow Black (finish move): ${other.join(', ')}.`);
-    lines.push(`Anything else lets Black finish on move ${g.makerMoves + base.value}.`);
+  const finish = g.makerMoves + best;
+  const rows = [...map].filter(([, v]) => v.value > base.value)
+    .sort((a, b) => b[1].value - a[1].value || b[1].blocked - a[1].blocked);
+  const perfect = rows.filter(([, v]) => v.value === best);
+  const everywhere = best === base.value;
+  const bestNames = everywhere ? ['any point'] : perfect.map(([k]) => goName(k));
+  out.push(`SUMMARY: BEST ${bestNames.slice(0, 3).join(' ')}${bestNames.length > 3 ? ' …' : ''} | FINISH move ${finish} | LOST SO FAR ${lost}`);
+  if (log.length) {
+    const e = log[log.length - 1];
+    out.push(`LAST REPLY: ${goName(e.k)} ${e.lost ? `cost ${e.lost} move${e.lost > 1 ? 's' : ''}` : 'kept the best finish'}.`);
   }
-  return lines.join('\n');
+  out.push(`FINISH: with perfect defense from here, Black finishes on move ${finish}.`);
+  if (everywhere) {
+    out.push('BEST REPLIES: any point. All of Black\'s cards are equally fast here.');
+  } else {
+    out.push(...wrapList('BEST REPLIES:', bestNames));
+    const other = rows.filter(([, v]) => v.value < best).slice(0, 10).map(([k, v]) => `${goName(k)} (${g.makerMoves + v.value})`);
+    if (other.length) out.push(...wrapList('ALSO SLOW BLACK (finish move):', other));
+    out.push(`ANY OTHER REPLY: Black finishes on move ${g.makerMoves + base.value}.`);
+    out.push(`CARDS: Black holds ${total}; the best reply blocks ${perfect[0][1].blocked} of them.`);
+  }
+  const wins = g.winningPoints();
+  if (wins.length) out.push(`IGNORED WIN: Black could win now at ${wins.map(goName).join(' or ')}, but its plan won't play there.`);
+  out.push('KEY: a card is one prepared way for Black to win. Your stone blocks a card if it lands in that');
+  out.push('  card\'s area. Black always plays on its fastest unblocked card and never looks for other wins.');
+  return out;
 }
 
 function playUrl(origin, w, opts) {
-  return `${origin}/play?w=${w}${opts.glass ? '&glass=1' : ''}${opts.links ? '' : '&links=0'}`;
+  return `${origin}/play?w=${w}${opts.links ? '' : '&links=0'}${opts.glass ? '&glass=1' : ''}`;
 }
+
+const INTRO = [
+  'SNAKY IN 21 · text play. You are White (O). Black (X) is building the Snaky shape:',
+  'a line of four plus a two-stone tail that steps over one row, in any rotation or reflection.',
+  'Black always wins within 21 stones. Your score is how many stones Black needs; 21 is perfect.',
+];
 
 function gameText(origin, w, opts) {
   const { g, log } = replay(w);
-  const out = [];
-  out.push('SNAKY IN 21 · text play. You are White (O). Black (X) is building the Snaky hexomino:');
-  out.push('four in a row plus a two-stone tail that steps one row over at the end, in any rotation or reflection.');
-  out.push('Black always succeeds within 21 stones. Your score is how many stones Black needs (21 is perfect).');
-  out.push('');
-  out.push(boardText(g));
-  out.push('');
+  const out = [...INTRO, '', boardText(g), ''];
   const last = g.history[g.history.length - 1].cell;
-  out.push(`Black has ${g.makerMoves} stone${g.makerMoves > 1 ? 's' : ''}; its last move was ${goName(last)} (shown as @).`);
-  out.push('Moves so far: ' + g.history.map((h) => (h.who === 'maker' ? 'B ' : 'W ') + goName(h.cell)).join(', '));
-  if (opts.glass) out.push('', glassText(g, log));
+  const bl = g.history.filter((h) => h.who === 'maker').map((h) => goName(h.cell));
+  const wh = g.history.filter((h) => h.who === 'breaker').map((h) => goName(h.cell));
+  out.push(`STATUS: Black has ${g.makerMoves} stone${g.makerMoves > 1 ? 's' : ''}. Last Black move: ${goName(last)} (shown as @).` +
+    (g.won ? '' : ' Your move.'));
+  out.push(...wrapList('BLACK STONES:', bl, ' '));
+  if (wh.length) out.push(...wrapList('WHITE STONES:', wh, ' '));
+  out.push(...wrapList('MOVES:', g.history.map((h) => (h.who === 'maker' ? 'B ' : 'W ') + goName(h.cell))));
+  if (opts.glass) out.push('', ...glassText(g, log));
   out.push('');
   if (g.won) {
-    out.push(`GAME OVER: Black completed Snaky on its move ${g.won.moves}. Score: ${g.won.moves} of 21.`);
+    out.push(`GAME OVER. Black completed Snaky on its move ${g.won.moves}.`);
+    out.push(`SCORE: ${g.won.moves} of 21`);
     const sgf = '(;GM[1]FF[4]SZ[19]AP[Snaky in 21]PB[Maker (card 727)]PW[Breaker]RE[B+]' +
       g.history.map((h) => `;${h.who === 'maker' ? 'B' : 'W'}[${sgfOf(h.cell)}]`).join('') + ')';
-    out.push('', 'SGF (paste into the SGF box at ' + SITE + ' to review the game):', sgf);
-    out.push('', `New game: ${playUrl(origin, '', opts)}`);
+    out.push('', 'SGF (paste into the SGF box on the visual site to review the game):', SITE, sgf);
+    out.push('', 'NEW GAME:', playUrl(origin, '', opts));
     return out.join('\n');
   }
   // Always print the canonical URL of this position (any &move= already folded into w).
@@ -1243,12 +1294,12 @@ function gameText(origin, w, opts) {
       if (!example && g.inBoard(x, y) && g.isFree(S.key(x, y))) example = goName(S.key(x, y));
     }
   }
-  out.push(`Your move. This position is: ${here}`);
+  out.push('POSITION URL:', here);
+  out.push('TO PLAY: fetch the position URL with &move=<point> added. For example:');
   // No punctuation right after a URL: agents tend to copy it into the link.
-  out.push('To play a point, fetch that URL with &move=<point> added' + (opts.links ? ', or fetch the point\'s link below' : '') + '. For example:');
   out.push(`${here}&move=${example}`);
   if (opts.links) {
-    out.push('');
+    out.push('', 'MOVE LINKS (or fetch the link for the point you want):');
     for (let y = 18; y >= 0; y--) for (let x = 0; x < 19; x++) {
       const k = S.key(x, y);
       if (g.isFree(k)) out.push(`${goName(k)} ${playUrl(origin, w + sgfOf(k), opts)}`);
@@ -1261,24 +1312,32 @@ function homeText(origin) {
   return [
     'SNAKY IN 21 · text play',
     '',
-    'A Maker–Breaker game on a 19x19 Go board. Black (Maker) plays a proven strategy from the paper',
-    '"Snaky in 21 Maker moves" (OpenAI, 2026) and always builds the Snaky hexomino within 21 stones:',
+    'A Maker-Breaker game on a 19x19 Go board. Black (Maker) plays a proven strategy from the paper',
+    '"Snaky in 21 Maker moves" (OpenAI, 2026) and always builds the Snaky shape within 21 stones:',
     '',
     '      . . . X X',
     '      X X X X .      (any rotation or reflection)',
     '',
     'You play White (Breaker). Players alternate one stone at a time; stones never move or get captured.',
     'You cannot stop Black. Your score is the number of stones Black needs; 21 is a perfect defense.',
-    'Random play scores about 7.',
+    'Random play scores about 7. Points are written like Go: column A-T (no I), row 1-19 from the bottom.',
     '',
-    `Start a game:                      ${origin}/play?w=`,
-    `Start with strategy info shown:    ${origin}/play?w=&glass=1`,
+    'Black follows its prepared plan exactly. It never looks for other ways to win, so it may leave a',
+    'finished shape one move away and play elsewhere. A perfect defense takes advantage of that.',
     '',
-    'Each page shows the board and lists a link for every legal move. Fetch the link for the point you want.',
-    'If you can build URLs yourself, add &links=0 for a shorter page and play with &move=K11.',
-    'Points are written like Go: column A–T (no I), row 1–19 from the bottom.',
+    'START (recommended for agents: short pages, play by adding &move=K11):',
+    `${origin}/play?w=&links=0`,
     '',
-    `The visual version: ${SITE}`,
+    'START WITH THE STRATEGY VIEW (best replies, cards, ignored wins):',
+    `${origin}/play?w=&links=0&glass=1`,
+    '',
+    'START WITH A LINK FOR EVERY MOVE (for fetch tools that only follow links they have seen):',
+    `${origin}/play?w=`,
+    '',
+    'Every page prints its own position URL; the whole game is stored in it, so you can go back or branch.',
+    '',
+    'THE VISUAL VERSION:',
+    SITE,
   ].join('\n');
 }
 
@@ -1303,18 +1362,23 @@ export default {
     if (url.pathname !== '/play' && url.pathname !== '/textplay') return respond(`Not found. Start at ${origin}/`, 404);
     const p = url.searchParams;
     const opts = { glass: p.get('glass') === '1', links: p.get('links') !== '0' };
-    let w = (p.get('w') || '').toLowerCase();
+    const w0 = (p.get('w') || '').toLowerCase();
+    let w = w0;
     try {
       const mv = p.get('move') || p.get('m');
       if (mv) {
         const k = /^[a-s]{2}$/i.test(mv) && !fromGo(mv) ? fromSgf(mv.toLowerCase()) : fromGo(mv);
-        if (k == null) throw new BadRequest(`Can't read the move "${mv}". Use a point like K11 (column A–T without I, row 1–19).`);
+        if (k == null) throw new BadRequest(`Can't read the move "${mv}". Use a point like K11 (column A-T without I, row 1-19).`, w0);
         w += sgfOf(k);
       }
       return respond(gameText(origin, w, opts));
     } catch (e) {
       if (!(e instanceof BadRequest)) throw e;
-      return respond(`${e.message}\n\nGo back to the previous page and pick another point, or start over: ${origin}/play?w=`, 400);
+      // Point back at the last position that replays cleanly.
+      let back = e.back ?? '';
+      try { replay(back); } catch { back = ''; }
+      const lines = [`ERROR: ${e.message}`, '', 'BACK TO YOUR LAST POSITION:', playUrl(origin, back, opts), '', 'START OVER:', playUrl(origin, '', opts)];
+      return respond(lines.join('\n'), 400);
     }
   },
 };
