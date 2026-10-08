@@ -5,10 +5,14 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
+import { SYMBOLS } from './symbols.mjs';
 vm.runInThisContext(readFileSync(here('../../js/certificate.js'), 'utf8'));
-vm.runInThisContext(readFileSync(here('../../js/engine.js'), 'utf8'));
+// The engine, with its coordinate alphabet widened so it can read extended certificates.
+vm.runInThisContext(readFileSync(here('../../js/engine.js'), 'utf8').replace("const SYM = '0123456789ABCDEFG';", 'const SYM = ' + JSON.stringify(SYMBOLS) + ';'));
 export const S = globalThis.Snaky;
-export const cert = S.load(globalThis.SNAKY_CERTIFICATE);
+// EXTRA_CARDS=file appends already-verified new cards (numbered from 728) to the claim pool.
+export const extraLines = process.env.EXTRA_CARDS ? readFileSync(process.env.EXTRA_CARDS, 'utf8').trim().split('\n') : [];
+export const cert = S.load(globalThis.SNAKY_CERTIFICATE.trim() + (extraLines.length ? '\n' + extraLines.join('\n') : ''));
 
 // Board coordinates = certificate coordinates + OFF. The certificate's 17x17 box is [8,24]^2 and every
 // Snaky with 4+ stones in it lies within 4 more, so nothing ever touches the edge of a 33x33 board.

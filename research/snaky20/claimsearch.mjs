@@ -25,14 +25,15 @@ export const limits = { MAX_CAND: 8, MAX_K: 6 };
 const roots = new Map(cert.cards.map((c) => [c.root, c.id]));
 export const pool = [];
 const seenNode = new Set();
-(function collect(node) {
+function collect(node) {
   if (seenNode.has(node)) return;
   seenNode.add(node);
   if (!node.base) node.kids.forEach((k) => collect(k.node));
   if (node.A.size === 0) return; // card 727: needs nothing but has height 21, never useful here
   const A = [...node.A].map((k) => [S.kx(k), S.ky(k)]);
   pool.push({ node, A, T: node.T, h: node.h });
-})(cert.cards[cert.cards.length - 1].root);
+}
+for (const card of cert.cards) collect(card.root);
 pool.sort((a, b) => a.h - b.h);
 export const RS = Array.from({ length: 8 }, (_, s) => S.codeTransform(s, 0, 0));
 

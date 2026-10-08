@@ -10,7 +10,7 @@
 //   With dx,dy, proves only the position after Black (8,8) and White (8+dx, 8+dy), within goal-1 moves
 //   (by symmetry one reply per type covers them all).
 import { writeFileSync } from 'node:fs';
-import { S, OFF } from './lib.mjs';
+import { S, OFF, extraLines } from './lib.mjs';
 import { pool, RS, claims, placedT, makeCard, lines } from './claimsearch.mjs';
 
 const GOAL = +(process.argv[2] || 19);
@@ -142,7 +142,7 @@ const secs = ((Date.now() - t0) / 1000).toFixed(0);
 if (rootOr.pn === 0) {
   const root = makeCard(first, new Set([first]), new Set(rootAnd.K), cs, rootAnd.children.map(claimOf));
   console.log(`PROVED goal ${GOAL}: final card ${root.node.newId}, height ${root.h}, ${lines.length} new cards (${expansions} expansions, ${secs}s)`);
-  if (OUT) { writeFileSync(OUT, globalThis.SNAKY_CERTIFICATE.trim() + '\n' + lines.join('\n') + '\n'); console.log('wrote ' + OUT); }
+  if (OUT) { writeFileSync(OUT, [globalThis.SNAKY_CERTIFICATE.trim(), ...extraLines, ...lines].join('\n') + '\n'); console.log('wrote ' + OUT); }
 } else if (rootOr.dn === 0) {
   const dead = rootAnd.children.filter((c) => c.dn === 0).map((c) => `(${S.kx([...c.B][0]) - OFF},${S.ky([...c.B][0]) - OFF})`);
   console.log(`REFUTED within these move limits (max K ${MAX_K}): replies ${dead.join(' ')} cannot be handled (${expansions} expansions, ${secs}s)`);

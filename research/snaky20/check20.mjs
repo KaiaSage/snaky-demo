@@ -8,8 +8,8 @@ import vm from 'node:vm';
 import { SYMBOLS } from './symbols.mjs';
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 // Same engine, with only the coordinate alphabet widened to match the new certificate.
-const engineSrc = readFileSync(here('../../js/engine.js'), 'utf8').replace("const SYM = '0123456789ABCDEFG';", `const SYM = '${SYMBOLS}';`);
-if (!engineSrc.includes(SYMBOLS)) throw new Error('could not widen the alphabet');
+const engineSrc = readFileSync(here('../../js/engine.js'), 'utf8').replace("const SYM = '0123456789ABCDEFG';", 'const SYM = ' + JSON.stringify(SYMBOLS) + ';');
+if (!engineSrc.includes(JSON.stringify(SYMBOLS))) throw new Error('could not widen the alphabet');
 vm.runInThisContext(engineSrc);
 const S = globalThis.Snaky;
 const cert = S.load(readFileSync(here('./certificate20.txt'), 'utf8'));

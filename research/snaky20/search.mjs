@@ -1,7 +1,7 @@
 // Command line for the claim-guided search (claimsearch.mjs).
 // Usage: node search.mjs <t> [maxCandidates=8] [maxK=6] [out.txt]
 import { writeFileSync } from 'node:fs';
-import { S, OFF } from './lib.mjs';
+import { S, OFF, extraLines } from './lib.mjs';
 import { pool, RS, placedT, solve, makeCard, lines, stats, limits } from './claimsearch.mjs';
 
 const T_GOAL = +(process.argv[2] || 20);
@@ -43,5 +43,5 @@ for (const b of K) {
 if (ok) {
   const root = makeCard(first, M1, new Set(K), cs, kids);
   console.log(`FOUND: final card ${root.node.newId}, height ${root.h}, ${lines.length} new cards, ${stats.positions} positions searched`);
-  if (OUT) { writeFileSync(OUT, globalThis.SNAKY_CERTIFICATE.trim() + '\n' + lines.join('\n') + '\n'); console.log('wrote ' + OUT); }
+  if (OUT) { writeFileSync(OUT, [globalThis.SNAKY_CERTIFICATE.trim(), ...extraLines, ...lines].join('\n') + '\n'); console.log('wrote ' + OUT); }
 } else console.log(`no proof found with these limits (${stats.positions} positions)`);
